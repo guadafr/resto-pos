@@ -296,27 +296,48 @@
 
 <!-- === Server config === -->
 <script>
-const SERVER_HOST = localStorage.getItem('restopos_server_host') || location.hostname || 'localhost';
-const SERVER_PORT = Number(localStorage.getItem('restopos_server_port') || 3002);
-const SERVER = `${location.protocol}//${SERVER_HOST}:${SERVER_PORT}`;
+// === Server config (Render-friendly) ===
+const savedHost = localStorage.getItem('restopos_server_host');   // opcional
+const savedPort = localStorage.getItem('restopos_server_port');   // opcional
+
+let SERVER;
+
+// Si NO estamos en localhost (o sea, en Render/producción) => usar mismo origen sin puerto.
+if (location.hostname !== 'localhost') {
+  SERVER = location.origin; // ej: https://restopos-b6rd.onrender.com
+} else {
+  // Modo local: permitir host/puerto custom, default 3002
+  const host = savedHost || 'localhost';
+  const port = Number(savedPort) || 3002;
+  SERVER = ${location.protocol}//${host}:${port};
+}
+
 console.log('API ->', SERVER);
 
-const api = (p, opt={}) => fetch(SERVER + p, Object.assign({headers:{'Content-Type':'application/json'}}, opt));
-let SERVER_OK = false;
-let _pongTs = 0;
+// Helper para llamar a la API
+const api = (p, opt = {}) =>
+  fetch(${SERVER}${p}, Object.assign({ headers: { 'Content-Type': 'application/json' } }, opt));
 
-async function ensureServer(){
+// Healthcheck
+let SERVER_OK = false;
+let _pongsTs = 0;
+
+async function ensureServer() {
   const now = Date.now();
-  if (now - _pongTs < 5000) return SERVER_OK;
-  try{
+  if (now - _pongsTs < 5000) return SERVER_OK;
+  try {
     const r = await api('/api/ping');
     SERVER_OK = r.ok;
-  }catch{
+  } catch {
     SERVER_OK = false;
   }
-  _pongTs = now;
+  _pongsTs = now;
   return SERVER_OK;
 }
+
+
+
+
 </script>
 
 <script>
