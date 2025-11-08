@@ -1,0 +1,1482 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Admin</title>
+<link rel="manifest" href="manifest.json">
+<style>
+  body{margin:0;background:#0e1420;color:#e8eef7;font-family:system-ui,-apple-system,Segoe UI,Roboto}
+  header{display:flex;align-items:center;gap:10px;padding:10px 14px;border-bottom:1px solid #223049;background:#0f1522}
+  h1{font-size:16px;margin:0 8px 0 0}
+  .tabs{display:flex;gap:8px}
+  .tab{border:none;border-radius:8px;padding:8px 12px;background:#223049;border:1px solid #2b3b59;color:#e8eef7;cursor:pointer}
+  .tab.active{background:#2a3a5a}
+  .toolbar{margin-left:auto}
+  .btn{background:#223049;border:1px solid #2b3b59;color:#e8eef7;padding:8px 12px;border-radius:8px;cursor:pointer}
+  .btn.danger{background:#7a2e2e;border-color:#a33}
+  main{padding:14px;max-width:1200px;margin:0 auto}
+  table{width:100%;border-collapse:collapse;font-size:13px}
+  th,td{padding:8px;border-bottom:1px solid #223049;text-align:left}
+  input,select{background:#0f1929;color:#e8eef7;border:1px solid #2b3b59;border-radius:8px;padding:6px 8px}
+  .grid{display:grid;grid-template-columns:1fr 1fr;gap:14px}
+  @media (max-width:1000px){ .grid{grid-template-columns:1fr} }
+  .right{text-align:right}
+  .muted{color:#9fb2ce}
+  dialog{border:none;border-radius:16px;max-width:900px;width:clamp(320px,95vw,900px);background:#0f1929;color:#e8eef7;padding:0}
+  dialog::backdrop{background:rgba(0,0,0,.55)}
+</style>
+</head>
+<body>
+<header>
+  <h1>• Admin</h1>
+  <div class="tabs">
+    <button class="tab active" data-v="mesas">Mesas</button>
+    <button class="tab" data-v="productos">Productos</button>
+    <button class="tab" data-v="mozos">Mozos</button>
+    <button class="tab" data-v="caja">Caja</button>
+    <button class="tab" data-v="reportes">Reportes</button>
+    <button class="tab" data-v="config">Configuración</button>
+  </div>
+  <div class="toolbar"><button class="btn" id="btnSalir">Cerrar sesión</button></div>
+</header>
+
+<main>
+  <!-- Mesas / pedidos abiertos -->
+  <section id="v-mesas">
+    <h3>Pedidos abiertos</h3>
+    <table id="tblAbiertos">
+      <thead><tr>
+        <th>Mesa</th><th>Tipo</th><th>Mozo</th><th>Inicio</th><th>Ítems</th><th class="right">Total</th><th></th>
+      </tr></thead>
+      <tbody></tbody>
+    </table>
+
+    <dialog id="dlgDetalle">
+      <div style="display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border-bottom:1px solid #223049">
+        <b id="detTitulo">Pedido</b>
+        <div style="display:flex;gap:8px;align-items:center">
+          <button class="btn" id="detImprimirCocina">Imprimir cocina</button>
+          <button class="btn danger" id="detAnular">Anular</button>
+          <button class="btn" id="detCerrar">✕</button>
+        </div>
+      </div>
+      <div style="padding:10px 12px">
+        <div id="detMeta" class="muted" style="margin-bottom:6px"></div>
+        <table id="detItems">
+          <thead><tr><th>Item</th><th>Cant</th><th class="right">Precio</th><th class="right">Subtotal</th></tr></thead>
+          <tbody></tbody>
+          <tfoot><tr><td colspan="3" class="right">Total</td><td id="detTotal" class="right">$ 0.00</td></tr></tfoot>
+        </table>
+      </div>
+    </dialog>
+
+    <!-- Dialog cobro (ADMIN) -->
+    <dialog id="dlgCobroAdmin">
+      <div style="padding:10px 12px;border-bottom:1px solid #223049"><b>Cobro</b></div>
+      <div style="padding:10px 12px">
+        <div style="display:flex;gap:10px;flex-wrap:wrap;align-items:end">
+          <label>Descuento ($ centavos) <input id="admPagoDesc" type="number" min="0" value="0"></label>
+          <button class="btn" id="admAddPago">Agregar medio</button>
+          <label style="margin-left:auto;display:flex;gap:6px;align-items:center">
+            <input type="checkbox" id="admPrintTicket" checked> Imprimir ticket
+          </label>
+        </div>
+
+        <table id="admTblPagos" style="margin-top:8px">
+          <thead><tr><th>Medio</th><th>Obs</th><th>Monto ($)</th><th></th></tr></thead>
+          <tbody></tbody>
+        </table>
+
+        <div class="muted" id="admPagoResumen" style="margin-top:6px"></div>
+
+        <div class="actions">
+          <button class="btn" id="admPagoOk">Confirmar cobro</button>
+          <button class="btn" id="admCobroCerrar">Cancelar</button>
+        </div>
+      </div>
+    </dialog>
+
+    <h3>Pedidos cobrados</h3>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end">
+      <label>Fecha <input type="date" id="paidFecha"></label>
+      <button class="btn" id="paidBuscar">Buscar</button>
+      <button class="btn" id="paidCSV">Exportar CSV</button>
+    </div>
+    <table id="tblPagados">
+      <thead><tr>
+        <th>Hora</th><th>Mesa</th><th>Tipo</th><th>Mozo</th><th>Pago</th>
+        <th class="right">Descuento</th><th class="right">Total</th><th></th>
+      </tr></thead>
+      <tbody></tbody>
+      <tfoot><tr><td colspan="6" class="right">Total día</td><td id="paidTotal" class="right">$ 0.00</td><td></td></tr></tfoot>
+    </table>
+  </section>
+
+  <!-- Productos -->
+  <section id="v-productos" style="display:none">
+    <div class="grid">
+      <div>
+        <h3>Editor</h3>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <input id="pId" placeholder="ID">
+          <input id="pNombre" placeholder="Nombre">
+          <input id="pPrecio" placeholder="Precio ($ pesos)" type="number" min="0" step="0.01">
+          <input id="pStock" placeholder="Stock" type="number" min="0">
+          <label>Categoría
+            <select id="pCatSel"></select>
+          </label>
+          <div style="display:flex;gap:8px;align-items:center">
+            <button class="btn" id="btnCatEditar">Categorías…</button>
+            <label style="display:flex;gap:6px;align-items:center">
+              <input id="pTrack" type="checkbox"> Controlar stock
+            </label>
+          </div>
+          <div style="display:flex;gap:8px">
+            <button class="btn" id="pGuardar">Guardar</button>
+            <button class="btn" id="pBorrar">Borrar</button>
+          </div>
+        </div>
+      </div>
+      <div>
+        <h3>Listado de productos</h3>
+        <table id="tblProd"><thead><tr><th>ID</th><th>Nombre</th><th>Cat</th><th>Precio</th><th>Stock</th><th>Ctrl</th></tr></thead><tbody></tbody></table>
+      </div>
+    </div>
+  </section>
+
+  <!-- Dialog categorías -->
+  <dialog id="dlgCats">
+    <div style="padding:14px 16px;display:grid;gap:10px;min-width:320px">
+      <b>Categorías</b>
+      <ul id="catList" style="margin:0;padding-left:16px"></ul>
+      <div style="display:flex;gap:8px">
+        <input id="catNew" placeholder="Nueva categoría" style="flex:1">
+        <button class="btn" id="catAdd">Agregar</button>
+      </div>
+      <div style="display:flex;gap:8px;justify-content:flex-end">
+        <button class="btn" id="catClose">Cerrar</button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- Mozos -->
+  <section id="v-mozos" style="display:none">
+    <div class="grid">
+      <div>
+        <h3>Editor</h3>
+        <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px">
+          <input id="mId" placeholder="ID">
+          <input id="mNombre" placeholder="Nombre">
+          <label>Activo <select id="mActivo"><option value="true">Sí</option><option value="false">No</option></select></label>
+          <div style="display:flex;gap:8px"><button class="btn" id="mGuardar">Guardar</button><button class="btn" id="mBorrar">Borrar</button></div>
+        </div>
+      </div>
+      <div>
+        <h3>Listado de mozos</h3>
+        <table id="tblMozos"><thead><tr><th>ID</th><th>Nombre</th><th>Activo</th></tr></thead><tbody></tbody></table>
+      </div>
+    </div>
+  </section>
+
+  <!-- Caja -->
+  <section id="v-caja" style="display:none">
+    <h3>Caja</h3>
+    <div id="boxState"></div>
+
+    <!-- Apertura -->
+    <div id="boxOpen" style="display:none;gap:8px;margin:8px 0;display:grid;grid-template-columns:repeat(4,minmax(160px,1fr));gap:8px;max-width:900px">
+      <label>Monto inicial ($ pesos) <input id="boxInicial" type="number" min="0" step="0.01" value="0"></label>
+      <label>Cajero <input id="boxCajero" placeholder="Nombre"></label>
+      <label>Turno <input id="boxTurno" placeholder="Mañana/Tarde/Noche"></label>
+      <button id="boxAbrir" class="btn" style="align-self:end">Abrir caja</button>
+    </div>
+
+    <!-- Caja abierta -->
+    <div id="boxRun" style="display:none">
+      <div style="margin:8px 0;display:flex;gap:12px;flex-wrap:wrap">
+        <div><b>Apertura:</b> <span id="lblAper"></span></div>
+        <div><b>Inicial:</b> <span id="lblInicial"></span></div>
+
+        <div><b>Efectivo:</b> <span id="lblPayEfe"></span></div>
+        <div><b>Tarjeta:</b> <span id="lblPayTar"></span></div>
+        <div><b>Transfer:</b> <span id="lblPayTra"></span></div>
+        <div><b>QR/Apps:</b> <span id="lblPayQR"></span></div>
+
+      </div>
+
+      <h4>Movimientos manuales</h4>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;margin:8px 0">
+        <label>Tipo <select id="movTipo"><option value="ingreso">Ingreso</option><option value="egreso">Egreso</option></select></label>
+        <label>Medio <select id="movMedio"><option>Efectivo</option><option>Tarjeta</option><option>Transferencia</option><option>QR</option></select></label>
+        <input id="movDesc" placeholder="Descripción">
+        <input id="movMonto" type="number" min="0" step="0.01" placeholder="Monto ($ pesos)">
+        <button id="movAgregar" class="btn">Agregar</button>
+      </div>
+
+      <table id="tblMov"><thead><tr><th>Hora</th><th>Tipo</th><th>Medio</th><th>Descripción</th><th>Monto</th></tr></thead><tbody></tbody></table>
+      <div style="display:flex;gap:8px;justify-content:flex-end;margin-top:12px;flex-wrap:wrap">
+        <div><b>EFECTIVO Esperado:</b> <span id="lblEfEsperado">$ 0.00</span></div>
+        <div><b>Total de caja:</b> <span id="lblTotalCaja"></span></div>
+        <button id="boxCerrar" class="btn">Cerrar caja</button>
+      </div>
+
+
+
+      <h4 style="margin-top:16px">Cobros del turno</h4>
+<table id="tblCobrosTurno">
+  <thead>
+    <tr>
+      <th>Hora</th>
+      <th>Medio</th>
+      <th>Descripción</th>
+      <th>Fuente</th>
+      <th>Pedido</th>
+      <th class="right">Monto</th>
+    </tr>
+  </thead>
+  <tbody></tbody>
+  <tfoot>
+    <tr>
+      <td colspan="5" class="right">Total cobrado</td>
+      <td id="cobrosTurnoTotal" class="right">$ 0.00</td>
+    </tr>
+  </tfoot>
+</table>
+
+    </div>
+
+    <hr style="margin:16px 0">
+
+    <!-- Historial -->
+    <h3>Historial de cajas</h3>
+    <div style="display:flex;gap:8px;flex-wrap:wrap;align-items:end">
+      <label>Desde <input type="date" id="histDesde"></label>
+      <label>Hasta <input type="date" id="histHasta"></label>
+      <button class="btn" id="histBuscar">Buscar</button>
+    </div>
+    <table id="tblHist">
+      <thead><tr>
+        <th>Apertura</th><th>Cierre</th><th>Cajero</th><th>Turno</th>
+        <th>Inicial</th><th>Ventas</th><th>Efectivo</th><th>Tarjeta</th><th>Transfer</th><th>QR</th>
+        <th>Ingresos</th><th>Gastos</th><th>Conteo Ef.</th><th>Esperado Ef.</th><th>Diferencia</th><th>Total caja</th>
+      </tr></thead>
+      <tbody></tbody>
+    </table>
+  </section>
+
+  <!-- Reportes -->
+  <section id="v-reportes" style="display:none">
+    <h3>Ventas por fecha</h3>
+    <div style="display:flex;gap:8px;flex-wrap:wrap">
+      <label>Desde <input type="date" id="repDesde"></label>
+      <label>Hasta <input type="date" id="repHasta"></label>
+      <button class="btn" id="repRun">Buscar</button>
+    </div>
+    <table id="tblRep">
+      <thead><tr><th>Fecha/Hora</th><th>Mesa</th><th>Tipo</th><th>Mozo</th><th>Total</th></tr></thead>
+      <tbody></tbody>
+      <tfoot><tr><td colspan="4" style="text-align:right">Total</td><td id="repTotal">$ 0.00</td></tr></tfoot>
+    </table>
+  </section>
+
+  <!-- Configuración -->
+  <section id="v-config" style="display:none">
+    <h3>Configuración</h3>
+    <div style="display:grid;grid-template-columns:1fr 1fr;gap:8px;max-width:640px">
+      <input id="cfgNombre" placeholder="Nombre del restaurante">
+      <input id="cfgPin" placeholder="PIN administrador">
+      <label>Mesas <input id="cfgMesas" type="number" min="1" max="50"></label>
+      <label>Imprimir cocina al guardar <select id="cfgCocinaSave"><option value="true">Sí</option><option value="false">No</option></select></label>
+      <label>Imprimir cocina al cobrar <select id="cfgCocinaCharge"><option value="true">Sí</option><option value="false">No</option></select></label>
+      <button class="btn" id="cfgGuardar">Guardar configuración</button>
+    </div>
+  </section>
+</main>
+
+<!-- === Server config === -->
+<script>
+const SERVER_HOST = localStorage.getItem('restopos_server_host') || location.hostname || 'localhost';
+const SERVER_PORT = Number(localStorage.getItem('restopos_server_port') || 3002);
+const SERVER = `${location.protocol}//${SERVER_HOST}:${SERVER_PORT}`;
+console.log('API ->', SERVER);
+
+const api = (p, opt={}) => fetch(SERVER + p, Object.assign({headers:{'Content-Type':'application/json'}}, opt));
+let SERVER_OK = false;
+let _pongTs = 0;
+
+async function ensureServer(){
+  const now = Date.now();
+  if (now - _pongTs < 5000) return SERVER_OK;
+  try{
+    const r = await api('/api/ping');
+    SERVER_OK = r.ok;
+  }catch{
+    SERVER_OK = false;
+  }
+  _pongTs = now;
+  return SERVER_OK;
+}
+</script>
+
+<script>
+// === CONFIG merge ===
+let CONFIG = { restaurantName:'Mi Restaurante', adminPin:'1234', tables:20, autoPrintKitchenOnSave:false, autoPrintKitchenOnCharge:true };
+async function loadConfigMerged(){
+  try{
+    const cfgJSON = await fetch('config.json',{cache:'no-store'}).then(r=>r.ok?r.json():Promise.reject());
+    Object.assign(CONFIG, cfgJSON||{});
+  }catch{}
+  try{
+    const cfgLocal = JSON.parse(localStorage.getItem('restopos_config')||'{}');
+    Object.assign(CONFIG, cfgLocal||{});
+  }catch{}
+}
+
+// === IndexedDB helpers ===
+const DB_NAME='restoDBv23', DB_VER=1; let db;
+function openDB(){ return new Promise((res,rej)=>{ const req=indexedDB.open(DB_NAME,DB_VER);
+  req.onupgradeneeded=e=>{ const db=e.target.result;
+    if(!db.objectStoreNames.contains('orders')){ const os=db.createObjectStore('orders',{keyPath:'id',autoIncrement:true}); os.createIndex('byStatus','estado'); os.createIndex('byDate','fecha'); }
+    if(!db.objectStoreNames.contains('products')) db.createObjectStore('products',{keyPath:'id'});
+    if(!db.objectStoreNames.contains('cash')) db.createObjectStore('cash',{keyPath:'id',autoIncrement:true});
+    if(!db.objectStoreNames.contains('mozos')) db.createObjectStore('mozos',{keyPath:'id'});
+  }; req.onsuccess=()=>{db=req.result; res()}; req.onerror=()=>rej(req.error); });}
+function tx(s,m='readonly'){return db.transaction(s,m).objectStore(s)}
+function put(s,v){return new Promise((res,rej)=>{const r=tx(s,'readwrite').put(v); r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error)})}
+function getAll(s){return new Promise((res,rej)=>{const r=tx(s).getAll(); r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error)})}
+function get(s,id){return new Promise((res,rej)=>{const r=tx(s).get(id); r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error)})}
+function del(s,id){return new Promise((res,rej)=>{const r=tx(s,'readwrite').delete(id); r.onsuccess=()=>res(); r.onerror=()=>rej(r.error)})}
+const $=s=>document.querySelector(s), $$=s=>Array.from(document.querySelectorAll(s));
+function money(n){return '$ '+(n/100).toFixed(2)}
+function nowISO(){ return new Date().toISOString(); }
+function dstr(d){ return d.toISOString().slice(0,10); }
+function mapPagoKey(tipo){
+  const t=(tipo||'').toLowerCase();
+  if(t.includes('efectivo'))return 'efectivo';
+  if(t.includes('tarjeta'))return 'tarjeta';
+  if(t.includes('transfer'))return 'transferencia';
+  if(t.includes('qr')||t.includes('mp')||t.includes('mercado')||t.includes('pedido'))return 'qr';
+  return 'otros';
+}
+function medioKey(s){ const t=(s||'').toLowerCase(); if(t.includes('efectivo'))return 'efectivo'; if(t.includes('tarjeta'))return 'tarjeta'; if(t.includes('transfer'))return 'transferencia'; if(t.includes('qr'))return 'qr'; return 'otros'; }
+function normalizeBox(box){
+  if (!box) return box;
+  box.ventasByPay  = Object.assign({efectivo:0, tarjeta:0, transferencia:0, qr:0, otros:0}, box.ventasByPay  || {});
+  box.ingresosByPay= Object.assign({efectivo:0, tarjeta:0, transferencia:0, qr:0, otros:0}, box.ingresosByPay|| {});
+  box.egresosByPay = Object.assign({efectivo:0, tarjeta:0, transferencia:0, qr:0, otros:0}, box.egresosByPay || {});
+  box.movs = box.movs || [];
+  box.ventasTotal   = box.ventasTotal   || 0;
+  box.ingresosTotal = box.ingresosTotal || 0;
+  box.egresosTotal  = box.egresosTotal  || 0;
+  box.apertura      = box.apertura      || 0;
+  return box;
+}
+
+// Notificaciones / Toast
+const BC = new BroadcastChannel('restopos');
+function toast(msg){
+  const d=document.createElement('div');
+  d.textContent=msg;
+  d.style.cssText='position:fixed;right:12px;bottom:12px;background:#1e293b;color:#e8eef7;padding:10px 12px;border:1px solid #2b3b59;border-radius:10px;z-index:99999';
+  document.body.appendChild(d); setTimeout(()=>d.remove(), 3500);
+}
+
+// --- SHADOW BOX (caja local para sumar ventas cuando el server no actualiza caja) ---
+async function getLocalShadowOpenBox(){
+  const boxes = await getAll('cash');
+  return boxes.find(b => !b.cierre && b._shadow === true) || null;
+}
+async function saveLocalShadowBox(box){
+  box._shadow = true;
+  await put('cash', box);
+}
+function mergeBoxes(serverBox, localShadow){
+  if (!serverBox) return localShadow ? normalizeBox(localShadow) : null;
+  if (!localShadow) return normalizeBox(serverBox);
+  const s = normalizeBox(serverBox);
+  const l = normalizeBox(localShadow);
+  // Sumar ventas totales y por medio
+  s.ventasTotal += (l.ventasTotal || 0);
+  for (const k of ['efectivo','tarjeta','transferencia','qr','otros']){
+    s.ventasByPay[k] = (s.ventasByPay[k]||0) + (l.ventasByPay[k]||0);
+  }
+  // También ingresos/egresos si algún día los cargás como shadow
+  s.ingresosTotal += (l.ingresosTotal || 0);
+  s.egresosTotal  += (l.egresosTotal  || 0);
+  for (const k of ['efectivo','tarjeta','transferencia','qr','otros']){
+    s.ingresosByPay[k] = (s.ingresosByPay[k]||0) + (l.ingresosByPay[k]||0);
+    s.egresosByPay[k]  = (s.egresosByPay[k] ||0) + (l.egresosByPay[k] ||0);
+  }
+
+  // 🔹 Mezclar también los movimientos (ventas, ingresos, egresos)
+  s.movs = [...(s.movs || []), ...(l.movs || [])];
+
+  return s;
+}
+ 
+async function addVentaToLocalCash(pagos, total, meta = { fuente: 'admin', pedidoId: null }) {
+  // usar o crear caja shadow
+  let box = await getLocalShadowOpenBox();
+  if (!box) {
+    box = {
+      _shadow: true,
+      apertura: 0,
+      aperturaTs: nowISO(),
+      movs: [],
+      ventasByPay: { efectivo: 0, tarjeta: 0, transferencia: 0, qr: 0, otros: 0 },
+      ingresosByPay: { efectivo: 0, tarjeta: 0, transferencia: 0, qr: 0, otros: 0 },
+      egresosByPay: { efectivo: 0, tarjeta: 0, transferencia: 0, qr: 0, otros: 0 },
+      ventasTotal: 0, ingresosTotal: 0, egresosTotal: 0
+    };
+  } else {
+    box = normalizeBox(box);
+  }
+
+  // sumar totales por medio y registrar movimiento
+  box.ventasTotal = (box.ventasTotal || 0) + (total || 0);
+  pagos.forEach(p => {
+    const key = mapPagoKey(p.tipo);
+    box.ventasByPay[key] = (box.ventasByPay[key] || 0) + (p.monto || 0);
+
+    // 💾 registrar movimiento de venta
+    box.movs.push({
+      ts: nowISO(),
+      tipo: 'venta',
+      medio: p.tipo,
+      desc: p.obs || (meta.pedidoId ? `Pedido #${meta.pedidoId}` : ''),
+      monto: p.monto || 0,
+      fuente: meta.fuente || 'admin',
+      pedidoId: meta.pedidoId || null
+    });
+  });
+
+  await saveLocalShadowBox(box);
+}
+
+
+// === Datos (server + fallback) ===
+async function fetchOpenOrders(){
+  if (await ensureServer()){
+    const r = await api('/api/orders?estado=abierto');
+    if (r.ok){
+      const j = await r.json();
+      return j.orders || [];
+    }
+  }
+  const all=await getAll('orders');
+  return all.filter(o=>o.estado==='abierto').sort((a,b)=> new Date(a.inicio)-new Date(b.inicio));
+}
+async function fetchPaidOrders(fechaISO){
+  if (await ensureServer()){
+    const r = await api('/api/orders?estado=cerrado&date='+encodeURIComponent(fechaISO));
+    if (r.ok){
+      const j = await r.json();
+      return j.orders || [];
+    }
+  }
+  const all=await getAll('orders');
+  return all.filter(o => o.estado==='cerrado' && o.fecha===fechaISO)
+            .sort((a,b)=> new Date(a.cierre) - new Date(b.cierre));
+}
+async function cancelOrder(id){
+  if (await ensureServer()){
+    const r = await api(`/api/orders/${id}/status`, {method:'POST', body: JSON.stringify({estado:'anulado', motivo:'Anulado desde Admin'})});
+    if (r.ok) return true;
+  }
+  const o = await get('orders', id);
+  if (!o) return false;
+  await rollbackCajaYStock(o);
+  o.estado = 'anulado'; o.cancelTs = nowISO(); o.cancelReason='Anulado desde Admin';
+  await put('orders', o);
+  return true;
+}
+
+// === Productos ===
+async function fetchProducts(){
+  if (await ensureServer()){
+    const r = await api('/api/products');
+    if (!r.ok) return [];
+    const data = await r.json();
+    return Array.isArray(data) ? data : (data.products || []);
+  }
+  return await getAll('products');
+}
+async function saveProduct(prod){
+  if (await ensureServer()){
+    const r = await api('/api/products', { method:'POST', body: JSON.stringify(prod) });
+    return r.ok;
+  }
+  await put('products', prod);
+  return true;
+}
+async function deleteProduct(id){
+  if (await ensureServer()){
+    const r = await api(`/api/products/${encodeURIComponent(id)}`, { method:'DELETE' });
+    return r.ok;
+  }
+  await del('products', id);
+  return true;
+}
+
+// === Mozos ===
+async function fetchMozos(){
+  if (await ensureServer()){
+    const r = await api('/api/mozos');
+    if (r.ok){
+      const j = await r.json();
+      if (Array.isArray(j)) return j;
+      if (j && Array.isArray(j.mozos)) return j.mozos;
+      return [];
+    }
+  }
+  return await getAll('mozos');
+}
+async function saveMozo(m){
+  if (await ensureServer()){
+    const r = await api('/api/mozos', { method:'POST', body: JSON.stringify(m) });
+    return r.ok;
+  }
+  await put('mozos', m);
+  return true;
+}
+async function deleteMozo(id){
+  if (await ensureServer()){
+    const r = await api(`/api/mozos/${encodeURIComponent(id)}`, { method:'DELETE' });
+    return r.ok;
+  }
+  await del('mozos', id);
+  return true;
+}
+
+// --- Helpers de caja ---
+function calcEfEsperado(box){
+  return Math.max(0,
+    (box.apertura || 0) +
+    (box.ingresosByPay?.efectivo || 0) +
+    (box.ventasByPay?.efectivo || 0) -
+    (box.egresosByPay?.efectivo || 0)
+  );
+}
+function calcTotalCaja(box){
+  return Math.max(0,
+    (box.apertura || 0) +
+    (box.ingresosTotal || 0) +
+    (box.ventasTotal || 0) -
+    (box.egresosTotal || 0)
+  );
+}
+
+// === Caja (Server + fallback) ===
+async function serverGetOpenCash(){
+  const r = await api('/api/cash/open');
+  if (r.status === 404) return null;
+  if (!r.ok) throw new Error('HTTP '+r.status+' '+await r.text());
+  return await r.json(); // box
+}
+async function serverOpenCash(apertura,cajero,turno){
+  const r = await api('/api/cash/open', {method:'POST', body: JSON.stringify({apertura,cajero,turno})});
+  if (!r.ok) throw new Error(`HTTP ${r.status} ${await r.text()}`);
+  const js = await r.json();
+  return js?.box || js;
+}
+async function serverAddMov(tipo, medio, desc, monto){
+  const r = await api('/api/cash/mov', {method:'POST', body: JSON.stringify({tipo,medio,desc,monto})});
+  if (!r.ok) throw new Error(`HTTP ${r.status} ${await r.text()}`);
+  const js = await r.json();
+  return js?.box || js;
+}
+async function serverCloseCash(conteo){
+  const r = await api('/api/cash/close', {method:'POST', body: JSON.stringify({conteo})});
+  if (!r.ok) throw new Error(`HTTP ${r.status} ${await r.text()}`);
+  const js = await r.json();
+  return js?.box || js;
+}
+async function serverCashHistory(desde,hasta){
+  const q = `?desde=${encodeURIComponent(desde||'')}&hasta=${encodeURIComponent(hasta||'')}`;
+  const r = await api('/api/cash/history'+q);
+  if (!r.ok) throw new Error('cash_history_error');
+  return r.json();
+}
+async function getOpenCashBox(){
+  // 1) Intentar servidor
+  let serverBox = null;
+  if (await ensureServer()){
+    try{ serverBox = await serverGetOpenCash(); }catch{}
+  }
+  // 2) Shadow local
+  const localShadow = await getLocalShadowOpenBox();
+  if (serverBox || localShadow) return mergeBoxes(serverBox, localShadow);
+  // 3) Fallback local "normal"
+  const boxes = await getAll('cash');
+  return boxes.find(b => !b.cierre) || null;
+}
+
+// =================== UI: Tabs ===================
+document.querySelector('.tabs').onclick=e=>{
+  const b=e.target.closest('.tab'); if(!b)return;
+  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active');
+  ['mesas','productos','mozos','caja','reportes','config'].forEach(v=>{
+    document.getElementById('v-'+v).style.display = (b.dataset.v===v)?'block':'none';
+  });
+  if(b.dataset.v==='mesas') loadAbiertos();
+  if(b.dataset.v==='caja')  renderCaja();
+};
+document.getElementById('btnSalir').onclick=()=>{ location.href='index.html?v=235'; };
+
+// =================== Mesas / Abiertos ===================
+let ultimoPedidoVisto=null;
+
+async function loadAbiertos(){
+  const tb=$("#tblAbiertos tbody"); tb.innerHTML='';
+  const abiertos = uniqueById(await fetchOpenOrders());
+
+  abiertos.forEach(o=>{
+    const tr=document.createElement('tr');
+    tr.innerHTML=`
+      <td>${o.mesa??'-'}</td>
+      <td>${o.tipo}</td>
+      <td>${o.mozo||'-'}</td>
+      <td>${new Date(o.inicio).toLocaleTimeString()}</td>
+      <td>${o.items?.length||0}</td>
+      <td class="right">${money(o.total||0)}</td>
+      <td>
+        <button class="btn" data-view="${o.id}">Ver</button>
+        <button class="btn" data-cobrar="${o.id}">Cobrar</button>
+        <button class="btn danger" data-del="${o.id}">Anular</button>
+      </td>`;
+    tb.appendChild(tr);
+  });
+
+  $$('#tblAbiertos [data-view]').forEach(b=> b.onclick=e=> verDetalle(parseInt(e.target.dataset.view,10)));
+  $$('#tblAbiertos [data-cobrar]').forEach(b=> b.onclick=e=>{
+    const id = parseInt(e.target.dataset.cobrar,10);
+    cobrarDesdeAdmin(id);
+  });
+}
+
+// Cobrados del día
+async function loadPagados(){
+  const tb = document.querySelector('#tblPagados tbody'); if (!tb) return;
+  tb.innerHTML = '';
+  let tot = 0;
+  const val = document.getElementById('paidFecha').value || dstr(new Date());
+  const list = uniqueById(await fetchPaidOrders(val));
+
+  list.forEach(o=>{
+    const totalLinea = (o.totalCobrado || o.total || 0);
+    tot += totalLinea;
+    const pagoTxt = o.pagos?.length ? o.pagos.map(p=>p.tipo).join(' + ')
+                   : (o.pago?.tipo || '-') + (o.pago?.obs ? (' · '+o.pago.obs) : '');
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${new Date(o.cierre).toLocaleTimeString()}</td>
+      <td>${o.mesa ?? '-'}</td>
+      <td>${o.tipo}</td>
+      <td>${o.mozo || '-'}</td>
+      <td>${pagoTxt}</td>
+      <td class="right">${o.descuento ? ('- ' + money(o.descuento)) : '$ 0.00'}</td>
+      <td class="right">${money(totalLinea)}</td>
+      <td><button class="btn danger" data-del="${o.id}">Anular</button></td>`;
+    tb.appendChild(tr);
+  });
+  document.getElementById('paidTotal').textContent = money(tot);
+}
+document.getElementById('paidBuscar')?.addEventListener('click', loadPagados);
+
+document.getElementById('paidCSV')?.addEventListener('click', async ()=>{
+  const val = document.getElementById('paidFecha').value || dstr(new Date());
+  const list = await fetchPaidOrders(val);
+  const rows = [['Hora','Mesa','Tipo','Mozo','Pago','Descuento','Total']];
+  list.forEach(o=>{
+    const pagoTxt = o.pagos?.length ? o.pagos.map(p=>p.tipo).join(' + ')
+                   : (o.pago?.tipo || '-') + (o.pago?.obs ? (' · '+o.pago.obs) : '');
+    rows.push([
+      new Date(o.cierre).toLocaleTimeString(),
+      o.mesa ?? '-',
+      o.tipo,
+      o.mozo || '-',
+      pagoTxt,
+      (o.descuento || 0)/100,
+      (o.totalCobrado || o.total || 0)/100
+    ]);
+  });
+  const csv = rows.map(r=>r.map(v=>`"${String(v).replace(/"/g,'""')}"`).join(',')).join('\n');
+  const blob = new Blob([csv], {type:'text/csv;charset=utf-8;'}); const url = URL.createObjectURL(blob);
+  const a = document.createElement('a'); a.href = url; a.download = `ventas_${val}.csv`; a.click();
+  setTimeout(()=>URL.revokeObjectURL(url), 1000);
+});
+
+// Modal detalle
+async function verDetalle(id){
+  let o = null;
+  try{
+    if (await ensureServer()){
+      let r = await api('/api/orders');
+      if (r.ok){
+        const j = await r.json();
+        const list = j.orders || [];
+        o = list.find(x => +x.id === +id) || null;
+      }
+    }
+  }catch{}
+  if (!o){
+    try{ o = await get('orders', id); }catch{}
+  }
+  if (!o){ alert('No se encontró el pedido.'); return; }
+
+  ultimoPedidoVisto = o;
+  document.getElementById('detTitulo').textContent = `Mesa ${o.mesa??'-'} · ${o.tipo}`;
+  document.getElementById('detMeta').textContent   = `Mozo: ${o.mozo||'-'} · Inicio: ${new Date(o.inicio).toLocaleString()}`;
+
+  const notaHtml = (o.nota && o.nota.trim())
+  ? `<div class="muted" style="margin:6px 0;white-space:pre-wrap;border:1px dashed #666;padding:4px">📝 ${o.nota}</div>`
+  : '';
+document.getElementById('detMeta').insertAdjacentHTML('afterend', notaHtml);
+
+  const tb = document.querySelector('#detItems tbody'); tb.innerHTML='';
+  (o.items||[]).forEach(it=>{
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td>${it.nombre}</td><td>${it.cant}</td><td class="right">${money(it.precio)}</td><td class="right">${money(it.precio*it.cant)}</td>`;
+    tb.appendChild(tr);
+  });
+  document.getElementById('detTotal').textContent = money(o.total||0);
+  document.getElementById('dlgDetalle').showModal();
+}
+
+function moneyFmt(n){ return '$ ' + (n/100).toFixed(2); }
+
+function adminNuevaFilaPagoRow(pago={tipo:'Efectivo', obs:'', monto:0}){
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td>
+      <select class="adm-p-tipo">
+        <option>Efectivo</option><option>Tarjeta</option>
+        <option>Transferencia</option><option>QR</option>
+      </select>
+    </td>
+    <td><input class="adm-p-obs" placeholder="Ej: Visa, QR MP, banco..."></td>
+    <td><input class="adm-p-monto" type="number" min="0" value="${(pago.monto||0)/100}"></td>
+    <td><button class="btn adm-p-del">X</button></td>`;
+  tr.querySelector('.adm-p-tipo').value = pago.tipo || 'Efectivo';
+  tr.querySelector('.adm-p-obs').value  = pago.obs  || '';
+  return tr;
+}
+function adminLeerPagosDesdeTabla(){
+  const rows = Array.from(document.querySelectorAll('#admTblPagos tbody tr'));
+  return rows.map(r => {
+    const tipo  = r.querySelector('.adm-p-tipo').value;
+    const obs   = r.querySelector('.adm-p-obs').value.trim();
+    const monto = Math.max(0, Math.round(parseFloat(r.querySelector('.adm-p-monto').value || '0') * 100));
+    return { tipo, obs, monto };
+  });
+}
+function adminActualizarResumenPagos(pedido){
+  const desc = Math.max(0, parseInt(document.getElementById('admPagoDesc').value || '0'));
+  const total = (pedido.items||[]).reduce((a,b)=> a + (b.precio||0)*(b.cant||0), 0);
+  const aCobrar = Math.max(0, total - desc);
+  const pagos = adminLeerPagosDesdeTabla();
+  const suma = pagos.reduce((a,p)=> a + p.monto, 0);
+  const diff = aCobrar - suma;
+  const el = document.getElementById('admPagoResumen');
+  el.textContent = `Subtotal ${money(total)} - Desc ${money(desc)} = A cobrar ${money(aCobrar)} · Pagos ${money(suma)} · Dif ${money(diff)}`;
+}
+function adminRenderTablaPagos(pedido, pagos){
+  const tb = document.querySelector('#admTblPagos tbody'); tb.innerHTML='';
+  pagos.forEach(p => tb.appendChild(adminNuevaFilaPagoRow(p)));
+  tb.querySelectorAll('.adm-p-del').forEach(btn => { btn.onclick = (e)=> { e.target.closest('tr').remove(); adminActualizarResumenPagos(pedido); }; });
+  tb.querySelectorAll('select,input').forEach(el => el.oninput = ()=> adminActualizarResumenPagos(pedido));
+  adminActualizarResumenPagos(pedido);
+}
+
+// --- ticket cliente ---
+function printClienteAR(o){
+  const w = window.open('', '_blank', 'width=420,height=640');
+  const rows = (o.items||[]).map(it =>
+    `<tr><td>${it.cant} x ${it.nombre}</td><td class="right">${moneyFmt(it.precio)}</td><td class="right">${moneyFmt(it.precio*it.cant)}</td></tr>`
+  ).join('');
+  const fecha = new Date(o.cierre || o.inicio).toLocaleString();
+  fetch('config.json').then(r=>r.json()).then(cfg=>{
+    const name   = cfg.restaurantName || 'Mi Restaurante';
+    const header = cfg.receiptHeader || 'Ticket no fiscal';
+    const footer = cfg.receiptFooter || '';
+    const total  = o.total || 0;
+    const desc   = o.descuento || 0;
+    const neto   = Math.max(0, total - desc);
+    const pagoTxt = o.pagos?.length
+      ? o.pagos.map(p=>`${p.tipo}${p.obs?(' '+p.obs):''} $${(p.monto/100).toFixed(2)}`).join(' / ')
+      : (o.pago?.tipo || '—') + (o.pago?.obs ? (' · '+o.pago.obs) : '');
+    w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Ticket</title>
+      <style>@page{size:80mm auto;margin:5mm}
+      body{font:12px/1.45 -apple-system,Segoe UI,Roboto,Arial}
+      h3{margin:0;text-align:center}
+      table{width:100%;border-collapse:collapse}
+      td,th{padding:2px 0;border-bottom:1px dashed #ccc}
+      .right{text-align:right}.muted{color:#666}</style></head><body>
+      <h3>${name}</h3>
+      <div class="muted" style="text-align:center">${header}</div>
+      <div class="muted">${fecha}</div>
+      <div>Tipo: ${o.tipo} · Mesa: ${o.mesa ?? '-' } · Mozo: ${o.mozo || '-'}</div>
+      ${o.nota ? `<div class="muted" style="margin:6px 0;white-space:pre-wrap;border:1px dashed #666;padding:4px">📝 ${o.nota}</div>` : ''}
+<hr>
+
+      <hr>
+      <table>
+        <thead><tr><th>Detalle</th><th class="right">P. Unit</th><th class="right">Importe</th></tr></thead>
+        <tbody>${rows}</tbody>
+      </table>
+      <table>
+        <tr><td colspan="2" class="right">Subtotal</td><td class="right">${moneyFmt(total)}</td></tr>
+        ${desc ? `<tr><td colspan="2" class="right">Descuento</td><td class="right">- ${moneyFmt(desc)}</td></tr>` : ''}
+        <tr><td colspan="2" class="right"><b>Total</b></td><td class="right"><b>${moneyFmt(neto)}</b></td></tr>
+        <tr><td colspan="3">Pago: ${pagoTxt}</td></tr>
+      </table>
+      <div class="muted" style="text-align:center;margin-top:8px">${footer}</div>
+      <script>window.print(); setTimeout(()=>window.close(), 300);<\/script>
+      </body></html>`);
+    w.document.close();
+  }).catch(()=>{ try{ w.close(); }catch(e){} });
+}
+
+async function cobrarDesdeAdmin(id){
+  let pedido = null;
+
+  try{
+    if (await ensureServer()){
+      let r = await api(`/api/orders/${id}`);
+      if (r.ok){
+        pedido = await r.json();
+      } else {
+        r = await api('/api/orders');
+        if (r.ok){
+          const j = await r.json();
+          const list = j.orders || [];
+          pedido = list.find(x => String(x.id) === String(id)) || null;
+        }
+      }
+    }
+  }catch{}
+  if (!pedido){
+    try{ pedido = await get('orders', id); }catch{}
+  }
+
+  if (!pedido){ alert('No se encontró el pedido.'); return; }
+  if (pedido.estado && pedido.estado !== 'abierto'){
+    alert('Este pedido no está abierto (estado: ' + pedido.estado + ').'); return;
+  }
+  if (!pedido.items?.length){ alert('Pedido vacío.'); return; }
+
+  const total = pedido.items.reduce((a,b)=> a + (b.precio||0)*(b.cant||0), 0);
+  const dlg = document.getElementById('dlgCobroAdmin');
+  const descInp = document.getElementById('admPagoDesc');
+  const addPagoBtn = document.getElementById('admAddPago');
+  const okBtn = document.getElementById('admPagoOk');
+  const cancelBtn = document.getElementById('admCobroCerrar');
+  const printChk = document.getElementById('admPrintTicket');
+
+
+
+
+  descInp.value = 0;
+  adminRenderTablaPagos(pedido, [{ tipo:'Efectivo', obs:'', monto: total }]);
+
+  addPagoBtn.onclick = ()=>{
+    const tb = document.querySelector('#admTblPagos tbody');
+    tb.appendChild(adminNuevaFilaPagoRow({tipo:'Efectivo', obs:'', monto:0}));
+    tb.querySelectorAll('select,input').forEach(el => el.oninput = ()=> adminActualizarResumenPagos(pedido));
+    tb.querySelectorAll('.adm-p-del').forEach(btn => btn.onclick = (e)=> { e.target.closest('tr').remove(); adminActualizarResumenPagos(pedido); });
+    adminActualizarResumenPagos(pedido);
+  };
+  cancelBtn.onclick = ()=> dlg.close();
+
+  okBtn.onclick = async ()=>{
+    const desc  = Math.max(0, parseInt(descInp.value || '0'));
+    const aCobrar = Math.max(0, total - desc);
+    const pagos = adminLeerPagosDesdeTabla();
+    const sumaPagos = pagos.reduce((a,p)=> a + p.monto, 0);
+    if (sumaPagos !== aCobrar){
+      alert(`La suma de pagos (${money(sumaPagos)}) debe igualar el total a cobrar (${money(aCobrar)}).`);
+      return;
+    }
+
+   
+      
+
+      const patch = {
+  pagos, descuento:desc,
+  total, totalCobrado:aCobrar,
+  items: pedido.items, tipo: pedido.tipo,
+  mesa: pedido.mesa, mozo: pedido.mozo,
+  cierre: nowISO(), fecha: pedido.fecha,
+  nota: (pedido.nota || '')
+};
+
+
+    try{
+      if (await ensureServer()){
+        const r = await api(`/api/orders/${pedido.id}/status`, {
+          method:'POST',
+          body: JSON.stringify({ estado:'cerrado', patch })
+        });
+        if (!r.ok) throw new Error('HTTP '+r.status+' '+await r.text());
+      } else {
+        // si querés: actualizar stock offline aquí
+      }
+
+      // SIEMPRE sumar a caja local (shadow)
+await addVentaToLocalCash(pagos, aCobrar, { fuente: 'admin', pedidoId: pedido.id });
+
+      // Persistir localmente el pedido
+      Object.assign(pedido, patch, { estado:'cerrado' });
+      try{ await put('orders', pedido); }catch{}
+
+      if (printChk.checked) printClienteAR(pedido);
+
+      dlg.close();
+      toast(`✅ Pedido cobrado: ${money(aCobrar)}`);
+      await loadAbiertos();
+      await loadPagados();
+      await renderCaja();
+      await renderHistorial?.();
+
+    }catch(err){
+      alert('No se pudo cobrar el pedido.\n\n' + (err?.message || err));
+    }
+  };
+
+  dlg.showModal();
+}
+
+document.getElementById('detCerrar').onclick=()=> document.getElementById('dlgDetalle').close();
+document.getElementById('detImprimirCocina').onclick=()=>{
+  if(!ultimoPedidoVisto) return;
+  const o=ultimoPedidoVisto;
+  const w=window.open('','_blank','width=400,height=600');
+  const rows=(o.items||[]).map(it=>`<div>${it.cant} x ${it.nombre}</div>`).join('');
+  const fecha=new Date(o.cierre||o.inicio).toLocaleString();
+  w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Comanda</title>
+  <style>@page{size:80mm auto;margin:5mm}body{font:12px/1.3 -apple-system,Segoe UI,Roboto,Arial}.muted{color:#666}</style></head><body>
+  <div>Mesa: ${o.mesa??'-'} · Mozo: ${o.mozo||'-'}</div>
+  ${o.nota ? `<div class="muted" style="margin:6px 0;white-space:pre-wrap;border:1px dashed #666;padding:4px">📝 ${o.nota}</div>` : ''}
+<hr>${rows}
+
+  <hr>${rows}<hr><div class="muted">${fecha}</div>
+  <script>window.print(); setTimeout(()=>window.close(), 300);<\/script>
+  </body></html>`); w.document.close();
+};
+document.getElementById('detAnular').onclick=async ()=>{
+  if(!ultimoPedidoVisto) return;
+  const ok = await cancelOrder(ultimoPedidoVisto.id);
+  if (!ok) return alert('No se pudo anular.');
+  await loadAbiertos(); await loadPagados(); await renderCaja(); await renderHistorial();
+  document.getElementById('dlgDetalle').close();
+  alert('Pedido anulado.');
+};
+
+// Delegación de clicks para botones data-del
+document.addEventListener('click', async (e)=>{
+  const btn = e.target.closest('button[data-del]');
+  if (!btn) return;
+  const id = Number(btn.dataset.del);
+  if (!Number.isFinite(id)) return;
+  if (!confirm('¿Anular este pedido?')) return;
+  const ok = await cancelOrder(id);
+  if (ok){ await loadAbiertos(); await loadPagados(); await renderCaja(); await renderHistorial(); }
+  else alert('No se pudo anular.');
+});
+
+// =================== Productos ===================
+async function fillProd(){
+  const tb=$("#tblProd tbody"); if(!tb) return; tb.innerHTML='';
+  const list = uniqueById(await fetchProducts());
+
+  list.forEach(p=>{
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td>${p.id}</td><td>${p.nombre}</td><td>${p.categoria||''}</td><td>${money(p.precio||0)}</td><td>${p.stock??''}</td><td>${p.trackStock?'Sí':'No'}</td>`;
+    tr.onclick=()=>{
+      $('#pId').value=p.id; 
+      $('#pNombre').value=p.nombre;
+      $('#pPrecio').value = ((p.precio||0) / 100).toFixed(2); 
+      document.getElementById('pTrack').checked = !!p.trackStock;
+      document.getElementById('pCatSel').value  = p.categoria || '';
+    };
+    tb.appendChild(tr);
+  });
+}
+$('#pGuardar').onclick = async ()=>{
+  const precioPesos = parseFloat(($('#pPrecio').value || '0').replace(',', '.')) || 0;
+  const precioCentavos = Math.round(precioPesos * 100);
+
+  const prod = {
+    id: $('#pId').value.trim(),
+    nombre: $('#pNombre').value || $('#pId').value,
+    precio: precioCentavos,
+    stock: parseInt($('#pStock').value || '0'),
+    categoria: document.getElementById('pCatSel').value || '',
+    trackStock: document.getElementById('pTrack').checked
+  };
+
+  if(!prod.id) return alert('ID requerido');
+  await saveProduct(prod);
+  await fillProd();
+  alert('Guardado');
+};
+$('#pBorrar').onclick=async()=>{
+  const id=$('#pId').value.trim(); if(!id) return;
+  if(confirm('¿Borrar '+id+'?')){ await deleteProduct(id); await fillProd(); }
+};
+
+// === Categorías (solo UI local) ===
+function getCats(){ try{ return JSON.parse(localStorage.getItem('restopos_categories')||'[]'); }catch{ return []; } }
+function saveCats(list){ localStorage.setItem('restopos_categories', JSON.stringify(Array.from(new Set(list)).filter(Boolean))); }
+function ensureDefaultCats(){ const cur=getCats(); if(!cur||cur.length===0) saveCats(['Entradas','Platos','Bebidas','Postres']); }
+function fillCatSelect(){
+  ensureDefaultCats();
+  const sel = document.getElementById('pCatSel'); if(!sel) return;
+  const cats = getCats();
+  sel.innerHTML = '';
+  cats.forEach(c=>{ const o=document.createElement('option'); o.value=c; o.textContent=c; sel.appendChild(o); });
+  const o=document.createElement('option'); o.value=''; o.textContent='(sin categoría)'; sel.appendChild(o);
+}
+function openCatsDialog(){
+  const dlg = document.getElementById('dlgCats');
+  const ul  = document.getElementById('catList');
+  const render = ()=>{
+    ul.innerHTML='';
+    getCats().forEach(c=>{
+      const li=document.createElement('li');
+      li.innerHTML = `<span>${c}</span> <button class="btn" data-del="${c}">x</button>`;
+      ul.appendChild(li);
+    });
+    ul.querySelectorAll('[data-del]').forEach(b=>{
+      b.onclick=()=>{
+        const c=b.getAttribute('data-del');
+        const cats=getCats().filter(x=>x!==c);
+        saveCats(cats); render(); fillCatSelect();
+      };
+    });
+  };
+  render();
+  document.getElementById('catAdd').onclick=()=>{
+    const v=(document.getElementById('catNew').value||'').trim(); if(!v) return;
+    saveCats([...getCats(), v]); document.getElementById('catNew').value=''; render(); fillCatSelect();
+  };
+  document.getElementById('catClose').onclick=()=> dlg.close();
+  dlg.showModal();
+}
+document.getElementById('btnCatEditar')?.addEventListener('click', openCatsDialog);
+
+// =================== Mozos ===================
+async function fillMozos(){
+  const tb=$("#tblMozos tbody"); if(!tb) return; tb.innerHTML='';
+
+  const list = uniqueById(await fetchMozos());
+
+  list.forEach(m=>{
+    const tr=document.createElement('tr');
+    tr.innerHTML=`<td>${m.id}</td><td>${m.nombre}</td><td>${m.activo!==false?'Sí':'No'}</td>`;
+    tr.onclick=()=>{ $('#mId').value=m.id; $('#mNombre').value=m.nombre; $('#mActivo').value=(m.activo!==false).toString(); };
+    tb.appendChild(tr);
+  });
+}
+$('#mGuardar').onclick=async()=>{
+  const moz={id:$('#mId').value.trim(), nombre:$('#mNombre').value||$('#mId').value, activo:($('#mActivo').value==='true')};
+  if(!moz.id) return alert('ID requerido');
+  await saveMozo(moz); await fillMozos(); alert('Guardado');
+};
+$('#mBorrar').onclick=async()=>{
+  const id=$('#mId').value.trim(); if(!id) return;
+  if(confirm('¿Borrar mozo '+id+'?')){ await deleteMozo(id); await fillMozos(); }
+};
+
+// =================== Reportes ===================
+$('#repRun').onclick=runRep;
+async function runRep(){
+  const d = document.getElementById('repDesde').value || new Date().toISOString().slice(0,10);
+  const h = document.getElementById('repHasta').value || new Date().toISOString().slice(0,10);
+
+  let list=[];
+  if (await ensureServer()){
+    const r = await api('/api/orders?estado=cerrado');
+    if (r.ok){
+      const j = await r.json();
+      list = (j.orders||[]).filter(o => (o.fecha||'') >= d && (o.fecha||'') <= h)
+                           .sort((a,b) => new Date(a.cierre) - new Date(b.cierre));
+    }
+  } else {
+    const all = await getAll('orders');
+    list = all.filter(o => o.estado === 'cerrado' && o.fecha >= d && o.fecha <= h)
+              .sort((a,b) => new Date(a.cierre) - new Date(b.cierre));
+  }
+
+  const tb = document.querySelector('#tblRep tbody');
+  tb.innerHTML = '';
+  let tot = 0;
+  list.forEach(o=>{
+    const t = (o.totalCobrado || o.total || 0);
+    tot += t;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `<td>${new Date(o.cierre).toLocaleString()}</td>
+                    <td>${o.mesa ?? '-'}</td><td>${o.tipo}</td><td>${o.mozo || '-'}</td>
+                    <td>${money(t)}</td>`;
+    tb.appendChild(tr);
+  });
+  document.getElementById('repTotal').textContent = money(tot);
+}
+
+function uniqueById(list){
+  const seen = new Set();
+  const out = [];
+  for (const x of list || []) {
+    const id = String(x && (x.id ?? x._id ?? ''));
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    out.push(x);
+  }
+  return out;
+}
+
+// =================== Caja ===================
+async function renderCaja(){ 
+  let open = await getOpenCashBox(); 
+  open = normalizeBox(open);
+
+  const state = document.getElementById('boxState');
+  const openRow = document.getElementById('boxOpen');
+  const run = document.getElementById('boxRun');
+
+  if(!open){
+    state.textContent = 'No hay caja abierta.';
+    openRow.style.display = 'grid';
+    run.style.display = 'none';
+    return;
+  }
+
+  const efEsperado = calcEfEsperado(open);
+  const totalCaja  = calcTotalCaja(open);
+
+  state.innerHTML = `<div style="display:flex;gap:12px;flex-wrap:wrap">
+    <span>Apertura: ${new Date(open.aperturaTs).toLocaleString()}</span>
+    <span>Cajero: ${open.cajero || '-'}</span>
+    <span>Turno: ${open.turno || '-'}</span>
+  </div>`;
+
+  openRow.style.display = 'none';
+  run.style.display = 'block';
+
+  document.getElementById('lblAper').textContent   = new Date(open.aperturaTs).toLocaleString();
+  document.getElementById('lblInicial').textContent = money(open.apertura || 0);
+
+  document.getElementById('lblPayEfe').textContent  = money(open.ventasByPay.efectivo || 0);
+  document.getElementById('lblPayTar').textContent  = money(open.ventasByPay.tarjeta || 0);
+  document.getElementById('lblPayTra').textContent  = money(open.ventasByPay.transferencia || 0);
+  document.getElementById('lblPayQR').textContent   = money(open.ventasByPay.qr || 0);
+  document.getElementById('lblEfEsperado').textContent = money(efEsperado);
+  document.getElementById('lblTotalCaja').textContent  = money(totalCaja);
+
+ // --- Renderizar los movimientos manuales (ingreso/egreso) ---
+const tb = document.querySelector('#tblMov tbody');
+tb.innerHTML = '';
+(open.movs || [])
+  .filter(m => m.tipo === 'ingreso' || m.tipo === 'egreso')
+  .forEach(m => {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${new Date(m.ts).toLocaleTimeString()}</td>
+      <td>${m.tipo}</td>
+      <td>${m.medio}</td>
+      <td>${m.desc || ''}</td>
+      <td>${money(m.monto)}</td>`;
+    tb.appendChild(tr);
+  });
+
+// --- Renderizar COBROS DEL TURNO (ventas de Admin + Mozo) ---
+const tbCob = document.querySelector('#tblCobrosTurno tbody');
+if (tbCob) {
+  tbCob.innerHTML = '';
+  let totalCobros = 0;
+
+  (open.movs || [])
+    .filter(m => m.tipo === 'venta') // <- SOLO ventas
+    .forEach(m => {
+      totalCobros += (m.monto || 0);
+      const tr = document.createElement('tr');
+      tr.innerHTML = `
+        <td>${new Date(m.ts).toLocaleTimeString()}</td>
+        <td>${m.medio || '-'}</td>
+        <td>${m.desc || ''}</td>
+        <td>${m.fuente || '-'}</td>
+        <td>${m.pedidoId ?? '-'}</td>
+        <td class="right">${money(m.monto || 0)}</td>`;
+      tbCob.appendChild(tr);
+    });
+
+  const totCell = document.getElementById('cobrosTurnoTotal');
+  if (totCell) totCell.textContent = money(totalCobros);
+}
+
+}
+
+// Abrir caja
+document.getElementById('boxAbrir').onclick = async ()=>{
+  let aperturaPesos = parseFloat(document.getElementById('boxInicial').value.replace(',', '.') || '0');
+  if (isNaN(aperturaPesos)) aperturaPesos = 0;
+  const apertura = Math.round(aperturaPesos * 100);
+
+  const cajero = document.getElementById('boxCajero').value.trim() || '';
+  const turno  = document.getElementById('boxTurno').value.trim()  || '';
+
+  if (await ensureServer()){
+    try{
+      await serverOpenCash(apertura, cajero, turno);
+    }catch(e){
+      alert('No se pudo abrir caja en servidor.\n\nDetalle: ' + (e?.message || e));
+      const box = {
+        apertura, aperturaTs: nowISO(), cajero, turno,
+        movs: [], ventasByPay:{efectivo:0,tarjeta:0,transferencia:0,qr:0,otros:0},
+        ingresosByPay:{efectivo:0,tarjeta:0,transferencia:0,qr:0,otros:0},
+        egresosByPay:{efectivo:0,tarjeta:0,transferencia:0,qr:0,otros:0},
+        ventasTotal:0, ingresosTotal:0, egresosTotal:0
+      };
+      await put('cash', box);
+    }
+  } else {
+    const box = {
+      apertura, aperturaTs: nowISO(), cajero, turno,
+      movs: [], ventasByPay:{efectivo:0,tarjeta:0,transferencia:0,qr:0,otros:0},
+      ingresosByPay:{efectivo:0,tarjeta:0,transferencia:0,qr:0,otros:0},
+      egresosByPay:{efectivo:0,tarjeta:0,transferencia:0,qr:0,otros:0},
+      ventasTotal:0, ingresosTotal:0, egresosTotal:0
+    };
+    await put('cash', box);
+  }
+
+  toast(`✅ Caja abierta con ${money(apertura)}`);
+  await renderCaja();
+};
+
+// Agregar movimiento manual
+document.getElementById('movAgregar').onclick = async ()=>{
+  let open = await getOpenCashBox(); if(!open) return; open = normalizeBox(open);
+  const tipo = document.getElementById('movTipo').value;
+  const medioSel = document.getElementById('movMedio').value;
+  const medio = medioKey(medioSel);
+  const desc = document.getElementById('movDesc').value;
+  const montoPesos = parseFloat((document.getElementById('movMonto').value || '0').replace(',', '.')) || 0;
+  const monto = Math.round(montoPesos * 100);
+
+  if (await ensureServer()){
+    try{
+      await serverAddMov(tipo, medioSel, desc, monto);
+    }catch{
+      return alert('No se pudo registrar el movimiento en servidor.');
+    }
+  } else {
+    const mov = { ts: nowISO(), tipo, medio: medioSel, desc, monto };
+    open.movs.push(mov);
+    if(tipo==='ingreso'){
+      open.ingresosTotal = (open.ingresosTotal||0) + monto;
+      open.ingresosByPay[medio] = (open.ingresosByPay[medio]||0) + monto;
+    } else {
+      open.egresosTotal = (open.egresosTotal||0) + monto;
+      open.egresosByPay[medio] = (open.egresosByPay[medio]||0) + monto;
+    }
+    await put('cash', open);
+  }
+  await renderCaja();
+};
+
+document.getElementById('boxCerrar').onclick = async ()=>{
+  let open = await getOpenCashBox(); 
+  if(!open) return alert('No hay caja abierta.');
+  open = normalizeBox(open);
+
+  const efEsperado = calcEfEsperado(open);
+  const totalCaja  = calcTotalCaja(open);
+
+  if (await ensureServer()){
+    try{
+      await serverCloseCash(efEsperado);
+      try{
+        const sh = await getLocalShadowOpenBox();
+        if (sh){
+          sh.cierre = true;
+          sh.cierreTs = nowISO();
+          await put('cash', sh);
+        }
+      }catch{}
+    }catch(e){
+      alert('No se pudo cerrar caja en servidor.\n\nDetalle: ' + (e?.message || e));
+      open.cierre = true;
+      open.cierreTs = nowISO();
+      open.conteo = efEsperado;
+      open.efectivoEsperado = efEsperado;
+      open.diferenciaEf = 0;
+      open.final = totalCaja;
+      await put('cash', open);
+    }
+  } else {
+    open.cierre = true;
+    open.cierreTs = nowISO();
+    open.conteo = efEsperado;
+    open.efectivoEsperado = efEsperado;
+    open.diferenciaEf = 0;
+    open.final = totalCaja;
+    await put('cash', open);
+  }
+
+  alert(`Caja cerrada.\nEfectivo esperado: ${money(efEsperado)}\nTotal de caja: ${money(totalCaja)}\n(Diferencia de efectivo: $ 0,00)`);
+  await renderCaja();
+  await renderHistorial();
+};
+
+// Historial de cajas
+function inRange(dayISO, d, h){ return (!d || dayISO >= d) && (!h || dayISO <= h); }
+async function renderHistorial(){
+  const tb = document.querySelector('#tblHist tbody'); if(!tb) return;
+  tb.innerHTML='';
+  const d = document.getElementById('histDesde').value;
+  const h = document.getElementById('histHasta').value;
+
+  let list=[];
+  if (await ensureServer()){
+    try{ list = await serverCashHistory(d,h); }catch{ list=[]; }
+  } else {
+    const boxes = await getAll('cash');
+    list = boxes.filter(b=>b.cierre).sort((a,b)=> new Date(a.aperturaTs)-new Date(b.aperturaTs));
+  }
+
+  list.forEach(b=>{
+    const apTs = b.aperturaTs || b.apertura_ts || '';
+    const day = (apTs||'').slice(0,10);
+    if(!inRange(day, d, h)) return;
+
+    b.ventasByPay = Object.assign(
+      {efectivo:0,tarjeta:0,transferencia:0,qr:0,otros:0},
+      b.ventasByPay || {}
+    );
+
+    const totalCaja = (typeof b.final === 'number')
+      ? b.final
+      : ((b.apertura||0) + (b.ingresosTotal||0) + (b.ventasTotal||0) - (b.egresosTotal||0));
+
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${apTs?new Date(apTs).toLocaleString():'-'}</td>
+      <td>${b.cierreTs?new Date(b.cierreTs).toLocaleString():'-'}</td>
+      <td>${b.cajero||'-'}</td>
+      <td>${b.turno||'-'}</td>
+      <td>${money(b.apertura||0)}</td>
+      <td>${money(b.ventasTotal||0)}</td>
+      <td>${money(b.ventasByPay.efectivo||0)}</td>
+      <td>${money(b.ventasByPay.tarjeta||0)}</td>
+      <td>${money(b.ventasByPay.transferencia||0)}</td>
+      <td>${money(b.ventasByPay.qr||0)}</td>
+      <td>${money(b.ingresosTotal||0)}</td>
+      <td>${money(b.egresosTotal||0)}</td>
+      <td>${money(b.conteo||0)}</td>
+      <td>${money(b.efectivoEsperado||0)}</td>
+      <td>${money(b.diferenciaEf||0)}</td>
+      <td><b>${money(totalCaja)}</b></td>
+    `;
+    tb.appendChild(tr);
+  });
+}
+document.getElementById('histBuscar')?.addEventListener('click', renderHistorial);
+
+// === Rollback local ===
+async function rollbackCajaYStock(o){
+  try{
+    let caja = o.boxId ? await get('cash', o.boxId) : null;
+    if (!caja) caja = (await getAll('cash')).find(b => !b.cierre);
+    if (caja && o.estado === 'cerrado') {
+      const totalCobrado = (o.totalCobrado || o.total || 0);
+      caja.ventasTotal = Math.max(0, (caja.ventasTotal || 0) - totalCobrado);
+      const pagos = (o.pagos && o.pagos.length) ? o.pagos
+                   : (o.pago ? [{ tipo:o.pago.tipo, monto: totalCobrado }] : []);
+      caja.ventasByPay = Object.assign({efectivo:0,tarjeta:0,transferencia:0,qr:0,otros:0}, caja.ventasByPay||{});
+      pagos.forEach(p=>{
+        const key = mapPagoKey(p.tipo);
+        caja.ventasByPay[key] = Math.max(0, (caja.ventasByPay[key]||0) - (p.monto||0));
+      });
+      await put('cash', caja);
+    }
+    if (o.estado === 'cerrado') {
+      const prods = await getAll('products');
+      for (const it of o.items) {
+        const p = prods.find(x=>x.id===it.id);
+        if (p && p.trackStock) { p.stock = (p.stock||0) + it.cant; await put('products', p); }
+      }
+    }
+  }catch(e){ console.warn('Rollback falló:', e); }
+}
+
+// =================== Config ===================
+async function loadConfigUI(){
+  await loadConfigMerged();
+  $('#cfgNombre').value = CONFIG.restaurantName || '';
+  $('#cfgPin').value    = CONFIG.adminPin || '';
+  $('#cfgMesas').value  = CONFIG.tables || 20;
+  $('#cfgCocinaSave').value   = String(!!CONFIG.autoPrintKitchenOnSave);
+  $('#cfgCocinaCharge').value = String(!!CONFIG.autoPrintKitchenOnCharge);
+}
+$('#cfgGuardar').onclick=async()=>{
+  const cfg={
+    restaurantName:$('#cfgNombre').value || 'Mi Restaurante',
+    adminPin:$('#cfgPin').value || '1234',
+    tables:parseInt($('#cfgMesas').value||'20'),
+    autoPrintKitchenOnSave: ($('#cfgCocinaSave').value==='true'),
+    autoPrintKitchenOnCharge: ($('#cfgCocinaCharge').value==='true')
+  };
+  localStorage.setItem('restopos_config', JSON.stringify(cfg));
+  alert('Configuración guardada en este equipo. Recargá Mozo/Admin para aplicar cambios.');
+};
+
+// =================== Boot ===================
+(async function boot(){
+  if ('serviceWorker' in navigator) {
+    try {
+      const EXPECTED = 'sw-v237.js';
+      const regs = await navigator.serviceWorker.getRegistrations();
+      const ok = regs.some(r => r.active?.scriptURL.includes(EXPECTED));
+      if (!ok) { await Promise.all(regs.map(r => r.unregister())); await navigator.serviceWorker.register(EXPECTED, { scope: './' }); }
+    } catch (e) { console.warn('SW no disponible:', e); }
+  }
+
+  await openDB();
+  await loadConfigMerged();
+
+  await loadAbiertos();
+
+  document.getElementById('paidFecha').value = new Date().toISOString().slice(0,10);
+  await loadPagados();
+
+  document.getElementById('histDesde').value = new Date().toISOString().slice(0,10);
+  document.getElementById('histHasta').value = new Date().toISOString().slice(0,10);
+
+  await renderCaja();
+  await renderHistorial();
+
+  fillCatSelect();
+  await fillProd();
+  await fillMozos();
+
+  await loadConfigUI();
+
+  setInterval(()=>{ if(document.querySelector('.tab.active')?.dataset.v==='mesas') loadAbiertos(); },15000);
+
+  try{
+    if (await ensureServer()){
+      const es = new EventSource(SERVER + '/api/events');
+      es.addEventListener('order_updated', ()=> { loadAbiertos(); });
+      es.addEventListener('order_closed',  ()=> { loadAbiertos(); loadPagados(); renderCaja(); });
+      es.addEventListener('order_cancelled',()=> { loadAbiertos(); loadPagados(); renderCaja(); });
+      es.addEventListener('cash_updated', ()=> { renderCaja(); renderHistorial(); });
+      es.onerror = ()=>{};
+    }
+  }catch(e){}
+})();
+</script>
+</body>
+</html>

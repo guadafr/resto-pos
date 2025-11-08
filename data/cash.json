@@ -1,0 +1,797 @@
+[
+  {
+    "apertura": 1000000,
+    "aperturaTs": "2025-10-28T14:59:47.330Z",
+    "cajero": "Guada",
+    "turno": "Noche",
+    "movs": [],
+    "ventasByPay": {
+      "efectivo": 0,
+      "tarjeta": 0,
+      "transferencia": 0,
+      "qr": 0,
+      "otros": 0
+    },
+    "ingresosByPay": {
+      "efectivo": 0,
+      "tarjeta": 0,
+      "transferencia": 0,
+      "qr": 0,
+      "otros": 0
+    },
+    "egresosByPay": {
+      "efectivo": 0,
+      "tarjeta": 0,
+      "transferencia": 0,
+      "qr": 0,
+      "otros": 0
+    },
+    "ventasTotal": 0,
+    "ingresosTotal": 0,
+    "egresosTotal": 0,
+    "cierre": true,
+    "cierreTs": "2025-10-28T15:36:29.321Z",
+    "conteo": 2000000,
+    "efectivoEsperado": 1000000,
+    "diferenciaEf": 1000000,
+    "final": 1000000
+  },
+  {
+    "apertura": 1500000,
+    "aperturaTs": "2025-10-28T15:36:52.897Z",
+    "cajero": "Guada",
+    "turno": "Noche",
+    "movs": [
+      {
+        "ts": "2025-10-28T15:37:04.287Z",
+        "tipo": "ingreso",
+        "medio": "Efectivo",
+        "desc": "vENTA2",
+        "monto": 200000
+      },
+      {
+        "ts": "2025-10-28T15:37:20.035Z",
+        "tipo": "ingreso",
+        "medio": "Transferencia",
+        "desc": "venta 3",
+        "monto": 150000
+      },
+      {
+        "ts": "2025-10-28T15:37:31.142Z",
+        "tipo": "egreso",
+        "medio": "Efectivo",
+        "desc": "compra 1",
+        "monto": 300000
+      }
+    ],
+    "ventasByPay": {
+      "efectivo": 0,
+      "tarjeta": 0,
+      "transferencia": 0,
+      "qr": 0,
+      "otros": 0
+    },
+    "ingresosByPay": {
+      "efectivo": 200000,
+      "tarjeta": 0,
+      "transferencia": 150000,
+      "qr": 0,
+      "otros": 0
+    },
+    "egresosByPay": {
+      "efectivo": 300000,
+      "tarjeta": 0,
+      "transferencia": 0,
+      "qr": 0,
+      "otros": 0
+    },
+    "ventasTotal": 0,
+    "ingresosTotal": 350000,
+    "egresosTotal": 300000,
+    "cierre": true,
+    "cierreTs": "2025-10-28T15:37:40.420Z",
+    "conteo": 0,
+    "efectivoEsperado": 1400000,
+    "diferenciaEf": -1400000,
+    "final": 1550000
+  },
+  {
+    "apertura": 100000,
+    "aperturaTs": "2025-10-28T15:50:55.339Z",
+    "cajero": "Guada",
+    "turno": "Noche",
+    "movs": [
+      {
+        "ts": "2025-10-28T15:51:34.537Z",
+        "tipo": "egreso",
+        "medio": "Efectivo",
+        "desc": "compra 1",
+        "monto": 100000
+      }
+    ],
+    "ventasByPay": {
+      "efectivo": 0,
+      "tarjeta": 0,
+      "transferencia": 0,
+      "qr": 0,
+      "otros": 0
+    },
+    "ingresosByPay": {
+      "efectivo": 0,
+      "tarjeta": 0,
+      "transferencia": 0,
+      "qr": 0,
+      "otros": 0
+    },
+    "egresosByPay": {
+      "efectivo": 100000,
+      "tarjeta": 0,
+      "transferencia": 0,
+      "qr": 0,
+      "otros": 0
+    },
+    "ventasTotal": 0,
+    "ingresosTotal": 0,
+    "egresosTotal": 100000,
+    "cierre": true,
+    "cierreTs": "2025-10-28T15:51:36.774Z",
+    "conteo": 0,
+    "efectivoEsperado": 0,
+    "diferenciaEf": 0,
+    "final": 0
+  },
+  {
+    "apertura": 1000000,
+    "aperturaTs": "2025-10-28T16:01:18.267Z",
+    "cajero": "Guada",
+    "turno": "Noche",
+    "movs": [
+      {
+        "ts": "2025-10-28T16:01:31.415Z",
+        "tipo": "ingreso",
+        "medio": "Efectivo",
+        "desc": "venta",
+        "monto": 200000
+      },
+      {
+        "ts": "2025-10-28T16:01:43.103Z",
+        "tipo": "ingreso",
+        "medio": "Transferencia",
+        "desc": "venta 2",
+        "monto": 500000
+      },
+      {
+        "ts": "2025-10-28T16:01:50.482Z",
+        "tipo": "ingreso",
+        "medio": "Transferencia",
+        "desc": "venta 3",
+        "monto": 150000
+      },
+      {
+        "ts": "2025-10-28T16:01:58.996Z",
+        "tipo": "egreso",
+        "medio": "Efectivo",
+        "desc": "compra 1",
+        "monto": 100000
+      }
+    ],
+    "ventasByPay": {
+      "efectivo": 0,
+      "tarjeta": 0,
+      "transferencia": 0,
+      "qr": 0,
+      "otros": 0
+    },
+    "ingresosByPay": {
+      "efectivo": 200000,
+      "tarjeta": 0,
+      "transferencia": 650000,
+      "qr": 0,
+      "otros": 0
+    },
+    "egresosByPay": {
+      "efectivo": 100000,
+      "tarjeta": 0,
+      "transferencia": 0,
+      "qr": 0,
+      "otros": 0
+    },
+    "ventasTotal": 0,
+    "ingresosTotal": 850000,
+    "egresosTotal": 100000,
+    "cierre": true,
+    "cierreTs": "2025-10-28T16:02:41.251Z",
+    "conteo": 1100000,
+    "efectivoEsperado": 1100000,
+    "diferenciaEf": 0,
+    "final": 1750000
+  },
+  {
+    "apertura": 1000000,
+    "aperturaTs": "2025-10-28T16:58:42.563Z",
+    "cajero": "Guada",
+    "turno": "",
+    "movs": [
+      {
+        "ts": "2025-10-28T16:59:03.969Z",
+        "tipo": "ingreso",
+        "medio": "Efectivo",
+        "desc": "venta 1",
+        "monto": 300000
+      },
+      {
+        "ts": "2025-10-28T16:59:12.136Z",
+        "tipo": "ingreso",
+        "medio": "Transferencia",
+        "desc": "venta 2",
+        "monto": 200000
+      },
+      {
+        "ts": "2025-10-28T16:59:19.430Z",
+        "tipo": "ingreso",
+        "medio": "Transferencia",
+        "desc": "venta 3",
+        "monto": 900000
+      },
+      {
+        "ts": "2025-10-28T16:59:30.244Z",
+        "tipo": "egreso",
+        "medio": "Efectivo",
+        "desc": "gasto 1",
+        "monto": 100000
+      }
+    ],
+    "ventasByPay": {
+      "efectivo": 0,
+      "tarjeta": 0,
+      "transferencia": 0,
+      "qr": 0,
+      "otros": 0
+    },
+    "ingresosByPay": {
+      "efectivo": 300000,
+      "tarjeta": 0,
+      "transferencia": 1100000,
+      "qr": 0,
+      "otros": 0
+    },
+    "egresosByPay": {
+      "efectivo": 100000,
+      "tarjeta": 0,
+      "transferencia": 0,
+      "qr": 0,
+      "otros": 0
+    },
+    "ventasTotal": 0,
+    "ingresosTotal": 1400000,
+    "egresosTotal": 100000,
+    "cierre": true,
+    "cierreTs": "2025-10-28T16:59:51.805Z",
+    "conteo": 1200000,
+    "efectivoEsperado": 1200000,
+    "diferenciaEf": 0,
+    "final": 2300000
+  },
+  {
+    "apertura": 1000000,
+    "aperturaTs": "2025-10-28T17:12:28.619Z",
+    "cajero": "Guada",
+    "turno": "Noche",
+    "movs": [
+      {
+        "ts": "2025-10-28T17:17:16.248Z",
+        "tipo": "ingreso",
+        "medio": "Efectivo",
+        "desc": "venta1",
+        "monto": 600000
+      },
+      {
+        "ts": "2025-10-28T17:17:21.385Z",
+        "tipo": "ingreso",
+        "medio": "Efectivo",
+        "desc": "venta2",
+        "monto": 200000
+      },
+      {
+        "ts": "2025-10-28T17:17:27.158Z",
+        "tipo": "ingreso",
+        "medio": "Efectivo",
+        "desc": "venta3",
+        "monto": 100000
+      },
+      {
+        "ts": "2025-10-28T17:17:35.343Z",
+        "tipo": "ingreso",
+        "medio": "Transferencia",
+        "desc": "venta4",
+        "monto": 900000
+      },
+      {
+        "ts": "2025-10-28T17:17:44.899Z",
+        "tipo": "egreso",
+        "medio": "Efectivo",
+        "desc": "compra 1",
+        "monto": 120000
+      },
+      {
+        "ts": "2025-10-28T17:17:53.898Z",
+        "tipo": "egreso",
+        "medio": "Transferencia",
+        "desc": "compra 2",
+        "monto": 300000
+      }
+    ],
+    "ventasByPay": {
+      "efectivo": 0,
+      "tarjeta": 0,
+      "transferencia": 0,
+      "qr": 0,
+      "otros": 0
+    },
+    "ingresosByPay": {
+      "efectivo": 900000,
+      "tarjeta": 0,
+      "transferencia": 900000,
+      "qr": 0,
+      "otros": 0
+    },
+    "egresosByPay": {
+      "efectivo": 120000,
+      "tarjeta": 0,
+      "transferencia": 300000,
+      "qr": 0,
+      "otros": 0
+    },
+    "ventasTotal": 0,
+    "ingresosTotal": 1800000,
+    "egresosTotal": 420000,
+    "cierre": true,
+    "cierreTs": "2025-10-28T17:18:30.929Z",
+    "conteo": 1780000,
+    "efectivoEsperado": 1780000,
+    "diferenciaEf": 0,
+    "final": 2380000
+  },
+  {
+    "apertura": 1200000,
+    "aperturaTs": "2025-10-28T17:19:34.911Z",
+    "cajero": "Guada",
+    "turno": "Noche",
+    "movs": [
+      {
+        "ts": "2025-10-29T00:22:51.753Z",
+        "tipo": "venta",
+        "medio": "Efectivo",
+        "desc": "Mesa 1 · Wanda Nara",
+        "monto": 1100000
+      },
+      {
+        "ts": "2025-10-29T00:27:02.329Z",
+        "tipo": "venta",
+        "medio": "Transferencia",
+        "desc": "Mesa 1 · Maxi Lopez",
+        "monto": 1340000
+      },
+      {
+        "ts": "2025-10-29T00:27:36.598Z",
+        "tipo": "venta",
+        "medio": "QR",
+        "desc": "Mesa 2 · -",
+        "monto": 1180000
+      },
+      {
+        "ts": "2025-10-29T00:27:44.561Z",
+        "tipo": "venta",
+        "medio": "Efectivo",
+        "desc": "Mesa 3 · Wanda Nara",
+        "monto": 2580000
+      }
+    ],
+    "ventasByPay": {
+      "efectivo": 3680000,
+      "tarjeta": 0,
+      "transferencia": 1340000,
+      "qr": 1180000,
+      "otros": 0
+    },
+    "ingresosByPay": {
+      "efectivo": 0,
+      "tarjeta": 0,
+      "transferencia": 0,
+      "qr": 0,
+      "otros": 0
+    },
+    "egresosByPay": {
+      "efectivo": 0,
+      "tarjeta": 0,
+      "transferencia": 0,
+      "qr": 0,
+      "otros": 0
+    },
+    "ventasTotal": 6200000,
+    "ingresosTotal": 0,
+    "egresosTotal": 0,
+    "cierre": true,
+    "cierreTs": "2025-10-29T00:29:34.347Z",
+    "conteo": 4880000,
+    "efectivoEsperado": 4880000,
+    "diferenciaEf": 0,
+    "final": 7400000
+  },
+  {
+    "apertura": 1000000,
+    "aperturaTs": "2025-10-29T13:45:43.902Z",
+    "cajero": "Guada",
+    "turno": "Noche",
+    "movs": [
+      {
+        "ts": "2025-10-29T13:47:17.085Z",
+        "tipo": "venta",
+        "medio": "Tarjeta",
+        "desc": "Mesa 1 · Wanda Nara",
+        "monto": 2360000
+      },
+      {
+        "ts": "2025-10-29T13:47:26.375Z",
+        "tipo": "venta",
+        "medio": "Transferencia",
+        "desc": "Mesa 2 · Mona Flores",
+        "monto": 880000
+      },
+      {
+        "ts": "2025-10-29T13:47:32.300Z",
+        "tipo": "venta",
+        "medio": "Efectivo",
+        "desc": "Mesa 3 · Maxi Lopez",
+        "monto": 580000
+      },
+      {
+        "ts": "2025-10-29T13:48:48.377Z",
+        "tipo": "ingreso",
+        "medio": "Efectivo",
+        "desc": "compra 1",
+        "monto": 200000
+      },
+      {
+        "ts": "2025-10-29T13:49:05.240Z",
+        "tipo": "egreso",
+        "medio": "Transferencia",
+        "desc": "PAPAS",
+        "monto": 150000
+      }
+    ],
+    "ventasByPay": {
+      "efectivo": 580000,
+      "tarjeta": 2360000,
+      "transferencia": 880000,
+      "qr": 0,
+      "otros": 0
+    },
+    "ingresosByPay": {
+      "efectivo": 200000,
+      "tarjeta": 0,
+      "transferencia": 0,
+      "qr": 0,
+      "otros": 0
+    },
+    "egresosByPay": {
+      "efectivo": 0,
+      "tarjeta": 0,
+      "transferencia": 150000,
+      "qr": 0,
+      "otros": 0
+    },
+    "ventasTotal": 3820000,
+    "ingresosTotal": 200000,
+    "egresosTotal": 150000,
+    "cierre": true,
+    "cierreTs": "2025-10-29T13:49:08.281Z",
+    "conteo": 1780000,
+    "efectivoEsperado": 1780000,
+    "diferenciaEf": 0,
+    "final": 4870000
+  },
+  {
+    "apertura": 1000000,
+    "aperturaTs": "2025-10-29T14:41:15.480Z",
+    "cajero": "Guada",
+    "turno": "Noche",
+    "movs": [
+      {
+        "ts": "2025-10-29T15:02:10.144Z",
+        "tipo": "ingreso",
+        "medio": "Efectivo",
+        "desc": "compra 1",
+        "monto": 300000
+      },
+      {
+        "ts": "2025-10-29T15:02:25.938Z",
+        "tipo": "egreso",
+        "medio": "Efectivo",
+        "desc": "PAPAS",
+        "monto": 120000
+      }
+    ],
+    "ventasByPay": {
+      "efectivo": 0,
+      "tarjeta": 0,
+      "transferencia": 0,
+      "qr": 0,
+      "otros": 0
+    },
+    "ingresosByPay": {
+      "efectivo": 300000,
+      "tarjeta": 0,
+      "transferencia": 0,
+      "qr": 0,
+      "otros": 0
+    },
+    "egresosByPay": {
+      "efectivo": 120000,
+      "tarjeta": 0,
+      "transferencia": 0,
+      "qr": 0,
+      "otros": 0
+    },
+    "ventasTotal": 0,
+    "ingresosTotal": 300000,
+    "egresosTotal": 120000,
+    "cierre": true,
+    "cierreTs": "2025-10-29T15:02:27.633Z",
+    "conteo": 1180000,
+    "efectivoEsperado": 1180000,
+    "diferenciaEf": 0,
+    "final": 1180000
+  },
+  {
+    "apertura": 200000,
+    "aperturaTs": "2025-10-29T15:03:41.818Z",
+    "cajero": "",
+    "turno": "Noche",
+    "movs": [
+      {
+        "ts": "2025-10-29T15:03:48.402Z",
+        "tipo": "ingreso",
+        "medio": "Efectivo",
+        "desc": "vENTA2",
+        "monto": 300000
+      },
+      {
+        "ts": "2025-10-29T16:08:32.019Z",
+        "tipo": "venta",
+        "medio": "Efectivo",
+        "desc": "Mesa 1 · Maxi Lopez",
+        "monto": 880000
+      },
+      {
+        "ts": "2025-10-29T17:16:00.990Z",
+        "tipo": "venta",
+        "medio": "Efectivo",
+        "desc": "Mesa 1 · -",
+        "monto": 1000000
+      }
+    ],
+    "ventasByPay": {
+      "efectivo": 1880000,
+      "tarjeta": 0,
+      "transferencia": 0,
+      "qr": 0,
+      "otros": 0
+    },
+    "ingresosByPay": {
+      "efectivo": 300000,
+      "tarjeta": 0,
+      "transferencia": 0,
+      "qr": 0,
+      "otros": 0
+    },
+    "egresosByPay": {
+      "efectivo": 0,
+      "tarjeta": 0,
+      "transferencia": 0,
+      "qr": 0,
+      "otros": 0
+    },
+    "ventasTotal": 1880000,
+    "ingresosTotal": 300000,
+    "egresosTotal": 0,
+    "cierre": true,
+    "cierreTs": "2025-10-29T17:16:15.364Z",
+    "conteo": 2260000,
+    "efectivoEsperado": 2380000,
+    "diferenciaEf": -120000,
+    "final": 2380000
+  },
+  {
+    "apertura": 1000000,
+    "aperturaTs": "2025-10-29T17:48:55.239Z",
+    "cajero": "Guada",
+    "turno": "Noche",
+    "movs": [
+      {
+        "ts": "2025-10-29T17:49:22.106Z",
+        "tipo": "venta",
+        "medio": "Efectivo",
+        "desc": "Mesa 1 · -",
+        "monto": 880000
+      }
+    ],
+    "ventasByPay": {
+      "efectivo": 880000,
+      "tarjeta": 0,
+      "transferencia": 0,
+      "qr": 0,
+      "otros": 0
+    },
+    "ingresosByPay": {
+      "efectivo": 0,
+      "tarjeta": 0,
+      "transferencia": 0,
+      "qr": 0,
+      "otros": 0
+    },
+    "egresosByPay": {
+      "efectivo": 0,
+      "tarjeta": 0,
+      "transferencia": 0,
+      "qr": 0,
+      "otros": 0
+    },
+    "ventasTotal": 880000,
+    "ingresosTotal": 0,
+    "egresosTotal": 0,
+    "cierre": true,
+    "cierreTs": "2025-10-30T13:27:37.112Z",
+    "conteo": 3580000,
+    "efectivoEsperado": 1880000,
+    "diferenciaEf": 1700000,
+    "final": 1880000
+  },
+  {
+    "apertura": 1000000,
+    "aperturaTs": "2025-10-30T13:28:02.479Z",
+    "cajero": "Guada",
+    "turno": "Noche",
+    "movs": [
+      {
+        "ts": "2025-10-30T13:30:15.439Z",
+        "tipo": "venta",
+        "medio": "Transferencia",
+        "desc": "Mesa 1 · Wanda Nara",
+        "monto": 980000
+      },
+      {
+        "ts": "2025-10-30T13:31:26.770Z",
+        "tipo": "venta",
+        "medio": "Efectivo",
+        "desc": "Mesa 1 · -",
+        "monto": 800000
+      },
+      {
+        "ts": "2025-10-30T13:32:01.666Z",
+        "tipo": "ingreso",
+        "medio": "Efectivo",
+        "desc": "compra 1",
+        "monto": 100000
+      },
+      {
+        "ts": "2025-10-30T13:32:13.048Z",
+        "tipo": "egreso",
+        "medio": "Efectivo",
+        "desc": "vent",
+        "monto": 20000
+      },
+      {
+        "ts": "2025-10-30T13:32:25.661Z",
+        "tipo": "egreso",
+        "medio": "Efectivo",
+        "desc": "2",
+        "monto": 10000
+      }
+    ],
+    "ventasByPay": {
+      "efectivo": 800000,
+      "tarjeta": 0,
+      "transferencia": 980000,
+      "qr": 0,
+      "otros": 0
+    },
+    "ingresosByPay": {
+      "efectivo": 100000,
+      "tarjeta": 0,
+      "transferencia": 0,
+      "qr": 0,
+      "otros": 0
+    },
+    "egresosByPay": {
+      "efectivo": 30000,
+      "tarjeta": 0,
+      "transferencia": 0,
+      "qr": 0,
+      "otros": 0
+    },
+    "ventasTotal": 1780000,
+    "ingresosTotal": 100000,
+    "egresosTotal": 30000,
+    "cierre": true,
+    "cierreTs": "2025-10-30T13:32:37.936Z",
+    "conteo": 1870000,
+    "efectivoEsperado": 1870000,
+    "diferenciaEf": 0,
+    "final": 2850000
+  },
+  {
+    "apertura": 1000000,
+    "aperturaTs": "2025-10-30T14:14:30.260Z",
+    "cajero": "Guada",
+    "turno": "",
+    "movs": [
+      {
+        "ts": "2025-10-30T14:17:00.176Z",
+        "tipo": "venta",
+        "medio": "Efectivo",
+        "desc": "Mesa 3 · Mona Flores",
+        "monto": 580000
+      },
+      {
+        "ts": "2025-10-30T14:21:43.202Z",
+        "tipo": "venta",
+        "medio": "Transferencia",
+        "desc": "Mesa 2 · Maxi Lopez",
+        "monto": 1180000
+      },
+      {
+        "ts": "2025-10-30T14:23:46.078Z",
+        "tipo": "egreso",
+        "medio": "Efectivo",
+        "desc": "Papas",
+        "monto": 300000
+      },
+      {
+        "ts": "2025-10-30T14:24:28.760Z",
+        "tipo": "ingreso",
+        "medio": "Transferencia",
+        "desc": "Compra 1",
+        "monto": 120000
+      },
+      {
+        "ts": "2025-10-30T14:38:46.848Z",
+        "tipo": "venta",
+        "medio": "Transferencia",
+        "desc": "Mesa 1 · Wanda Nara",
+        "monto": 600000
+      },
+      {
+        "ts": "2025-10-30T14:38:46.862Z",
+        "tipo": "venta",
+        "medio": "Transferencia",
+        "desc": "Pedido 39 · Mesa 1 · Mozo Wanda Nara",
+        "monto": 600000
+      }
+    ],
+    "ventasByPay": {
+      "efectivo": 580000,
+      "tarjeta": 0,
+      "transferencia": 1780000,
+      "qr": 0,
+      "otros": 0
+    },
+    "ingresosByPay": {
+      "efectivo": 0,
+      "tarjeta": 0,
+      "transferencia": 120000,
+      "qr": 0,
+      "otros": 0
+    },
+    "egresosByPay": {
+      "efectivo": 300000,
+      "tarjeta": 0,
+      "transferencia": 600000,
+      "qr": 0,
+      "otros": 0
+    },
+    "ventasTotal": 2360000,
+    "ingresosTotal": 120000,
+    "egresosTotal": 900000
+  }
+]

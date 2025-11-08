@@ -1,0 +1,1263 @@
+[
+  {
+    "mesa": 1,
+    "tipo": "SALON",
+    "estado": "anulado",
+    "inicio": "2025-10-24T01:19:16.901Z",
+    "fecha": "2025-10-24",
+    "items": [
+      {
+        "id": "gin",
+        "nombre": "Gin tonic",
+        "precio": 5000,
+        "cant": 1
+      },
+      {
+        "id": "mil",
+        "nombre": "Milanesa",
+        "precio": 3000,
+        "cant": 1
+      }
+    ],
+    "total": 8000,
+    "mozo": "",
+    "workflow": "pendiente",
+    "id": 1,
+    "pagos": [
+      {
+        "tipo": "Efectivo",
+        "obs": "Visa",
+        "monto": 8000
+      }
+    ],
+    "descuento": 0,
+    "totalCobrado": 8000,
+    "cierre": "2025-10-24T13:19:25.811Z",
+    "cancelReason": "Anulado desde Admin",
+    "cancelTs": "2025-10-24T17:20:05.357Z"
+  },
+  {
+    "mesa": 1,
+    "tipo": "SALON",
+    "estado": "anulado",
+    "inicio": "2025-10-24T13:19:35.447Z",
+    "fecha": "2025-10-24",
+    "items": [],
+    "total": 0,
+    "mozo": "",
+    "workflow": "pendiente",
+    "id": 2,
+    "cancelReason": "Anulado desde Admin",
+    "cancelTs": "2025-10-24T13:20:33.906Z"
+  },
+  {
+    "mesa": 2,
+    "tipo": "SALON",
+    "estado": "anulado",
+    "inicio": "2025-10-24T13:19:57.887Z",
+    "fecha": "2025-10-24",
+    "items": [
+      {
+        "id": "gin",
+        "nombre": "Gin tonic",
+        "precio": 5000,
+        "cant": 1
+      },
+      {
+        "id": "mil",
+        "nombre": "Milanesa",
+        "precio": 3000,
+        "cant": 1
+      }
+    ],
+    "total": 8000,
+    "mozo": "",
+    "workflow": "pendiente",
+    "id": 3,
+    "pagos": [
+      {
+        "tipo": "Efectivo",
+        "obs": "",
+        "monto": 8000
+      }
+    ],
+    "descuento": 0,
+    "totalCobrado": 8000,
+    "cierre": "2025-10-24T13:20:17.220Z",
+    "cancelReason": "Anulado desde Admin",
+    "cancelTs": "2025-10-24T17:20:17.103Z"
+  },
+  {
+    "mesa": 1,
+    "tipo": "SALON",
+    "estado": "anulado",
+    "inicio": "2025-10-24T13:20:50.717Z",
+    "fecha": "2025-10-24",
+    "items": [],
+    "total": 0,
+    "mozo": "",
+    "workflow": "pendiente",
+    "id": 4
+  },
+  {
+    "mesa": 1,
+    "tipo": "SALON",
+    "estado": "anulado",
+    "inicio": "2025-10-24T14:29:54.355Z",
+    "fecha": "2025-10-24",
+    "items": [
+      {
+        "id": "loc",
+        "nombre": "Locro",
+        "precio": 600000,
+        "cant": 1
+      },
+      {
+        "id": "pap",
+        "nombre": "Papas fritas",
+        "precio": 300000,
+        "cant": 1
+      }
+    ],
+    "total": 600000,
+    "mozo": "",
+    "workflow": "pendiente",
+    "id": 5,
+    "cancelReason": "Anulado desde Admin",
+    "cancelTs": "2025-10-24T17:20:10.255Z"
+  },
+  {
+    "mesa": 1,
+    "tipo": "SALON",
+    "estado": "anulado",
+    "inicio": "2025-10-28T17:26:07.040Z",
+    "fecha": "2025-10-28",
+    "items": [],
+    "total": 0,
+    "mozo": "",
+    "workflow": "pendiente",
+    "id": 6
+  },
+  {
+    "mesa": 2,
+    "tipo": "SALON",
+    "estado": "anulado",
+    "inicio": "2025-10-28T17:26:11.727Z",
+    "fecha": "2025-10-28",
+    "items": [],
+    "total": 0,
+    "mozo": "",
+    "workflow": "pendiente",
+    "id": 7,
+    "cancelReason": "Anulado desde Admin",
+    "cancelTs": "2025-10-28T21:50:36.052Z"
+  },
+  {
+    "mesa": 1,
+    "tipo": "SALON",
+    "estado": "cerrado",
+    "inicio": "2025-10-28T17:26:35.563Z",
+    "fecha": "2025-10-28",
+    "items": [
+      {
+        "id": "gin",
+        "nombre": "Gin tonic",
+        "precio": 600000,
+        "cant": 1
+      },
+      {
+        "id": "pas",
+        "nombre": "Pastas",
+        "precio": 500000,
+        "cant": 1
+      }
+    ],
+    "total": 1100000,
+    "mozo": "Wanda Nara",
+    "workflow": "enprep",
+    "id": 8,
+    "descuento": 0,
+    "totalCobrado": 1100000,
+    "pagos": [
+      {
+        "tipo": "Efectivo",
+        "obs": "",
+        "monto": 1100000
+      }
+    ],
+    "cierre": "2025-10-29T00:22:51.752Z"
+  },
+  {
+    "mesa": null,
+    "tipo": "LLEVAR",
+    "estado": "anulado",
+    "inicio": "2025-10-28T21:52:08.077Z",
+    "fecha": "2025-10-28",
+    "items": [],
+    "total": 0,
+    "mozo": "",
+    "workflow": "pendiente",
+    "id": 9,
+    "cancelReason": "Anulado desde Admin",
+    "cancelTs": "2025-10-29T00:20:14.931Z"
+  },
+  {
+    "mesa": 2,
+    "tipo": "SALON",
+    "estado": "anulado",
+    "inicio": "2025-10-28T22:02:17.329Z",
+    "fecha": "2025-10-28",
+    "items": [],
+    "total": 0,
+    "mozo": "",
+    "workflow": "pendiente",
+    "id": 10,
+    "cancelReason": "Anulado desde Admin",
+    "cancelTs": "2025-10-29T00:20:10.250Z"
+  },
+  {
+    "mesa": null,
+    "tipo": "LLEVAR",
+    "estado": "anulado",
+    "inicio": "2025-10-28T22:02:28.639Z",
+    "fecha": "2025-10-28",
+    "items": [],
+    "total": 0,
+    "mozo": "",
+    "workflow": "pendiente",
+    "id": 11,
+    "cancelReason": "Anulado desde Admin",
+    "cancelTs": "2025-10-29T00:20:06.077Z"
+  },
+  {
+    "mesa": 1,
+    "tipo": "SALON",
+    "estado": "cerrado",
+    "inicio": "2025-10-29T00:23:13.589Z",
+    "fecha": "2025-10-29",
+    "items": [
+      {
+        "id": "loc",
+        "nombre": "Locro",
+        "precio": 380000,
+        "cant": 2
+      },
+      {
+        "id": "coc",
+        "nombre": "Coca Cola",
+        "precio": 280000,
+        "cant": 1
+      },
+      {
+        "id": "agu",
+        "nombre": "Agua mineral",
+        "precio": 300000,
+        "cant": 1
+      }
+    ],
+    "total": 1340000,
+    "mozo": "Maxi Lopez",
+    "workflow": "pendiente",
+    "id": 12,
+    "descuento": 0,
+    "totalCobrado": 1340000,
+    "pagos": [
+      {
+        "tipo": "Transferencia",
+        "obs": "",
+        "monto": 1340000
+      }
+    ],
+    "cierre": "2025-10-29T00:27:02.328Z"
+  },
+  {
+    "mesa": 2,
+    "tipo": "SALON",
+    "estado": "cerrado",
+    "inicio": "2025-10-29T00:24:13.169Z",
+    "fecha": "2025-10-29",
+    "items": [
+      {
+        "id": "lom",
+        "nombre": "Lomito",
+        "precio": 900000,
+        "cant": 1
+      },
+      {
+        "id": "coc",
+        "nombre": "Coca Cola",
+        "precio": 280000,
+        "cant": 1
+      }
+    ],
+    "total": 1180000,
+    "mozo": "",
+    "workflow": "pendiente",
+    "id": 13,
+    "descuento": 0,
+    "totalCobrado": 1180000,
+    "pagos": [
+      {
+        "tipo": "QR",
+        "obs": "",
+        "monto": 1180000
+      }
+    ],
+    "cierre": "2025-10-29T00:27:36.597Z"
+  },
+  {
+    "mesa": 3,
+    "tipo": "SALON",
+    "estado": "cerrado",
+    "inicio": "2025-10-29T00:24:26.767Z",
+    "fecha": "2025-10-29",
+    "items": [
+      {
+        "id": "gin",
+        "nombre": "Gin tonic",
+        "precio": 600000,
+        "cant": 1
+      },
+      {
+        "id": "pap",
+        "nombre": "Papas fritas",
+        "precio": 800000,
+        "cant": 1
+      },
+      {
+        "id": "coc",
+        "nombre": "Coca Cola",
+        "precio": 280000,
+        "cant": 1
+      },
+      {
+        "id": "lom",
+        "nombre": "Lomito",
+        "precio": 900000,
+        "cant": 1
+      }
+    ],
+    "total": 2580000,
+    "mozo": "Wanda Nara",
+    "workflow": "pendiente",
+    "id": 14,
+    "descuento": 0,
+    "totalCobrado": 2580000,
+    "pagos": [
+      {
+        "tipo": "Efectivo",
+        "obs": "",
+        "monto": 2580000
+      }
+    ],
+    "cierre": "2025-10-29T00:27:44.559Z"
+  },
+  {
+    "mesa": 1,
+    "tipo": "SALON",
+    "estado": "cerrado",
+    "inicio": "2025-10-29T00:38:00.951Z",
+    "fecha": "2025-10-29",
+    "items": [
+      {
+        "id": "gin",
+        "nombre": "Gin tonic",
+        "precio": 600000,
+        "cant": 1
+      },
+      {
+        "id": "pas",
+        "nombre": "Pastas",
+        "precio": 500000,
+        "cant": 1
+      }
+    ],
+    "total": 1100000,
+    "mozo": "Wanda Nara",
+    "workflow": "pendiente",
+    "id": 15,
+    "descuento": 0,
+    "totalCobrado": 1100000,
+    "pagos": [
+      {
+        "tipo": "Efectivo",
+        "obs": "",
+        "monto": 1100000
+      }
+    ],
+    "cierre": "2025-10-29T01:00:33.686Z"
+  },
+  {
+    "mesa": 1,
+    "tipo": "SALON",
+    "estado": "cerrado",
+    "inicio": "2025-10-29T01:15:44.122Z",
+    "fecha": "2025-10-29",
+    "items": [
+      {
+        "id": "gin",
+        "nombre": "Gin tonic",
+        "precio": 600000,
+        "cant": 1
+      },
+      {
+        "id": "pas",
+        "nombre": "Pastas",
+        "precio": 500000,
+        "cant": 1
+      }
+    ],
+    "total": 1100000,
+    "mozo": "Wanda Nara",
+    "workflow": "listo",
+    "id": 16,
+    "descuento": 0,
+    "totalCobrado": 1100000,
+    "pagos": [
+      {
+        "tipo": "Efectivo",
+        "obs": "",
+        "monto": 1100000
+      }
+    ],
+    "cierre": "2025-10-29T01:25:34.892Z"
+  },
+  {
+    "mesa": 1,
+    "tipo": "SALON",
+    "estado": "cerrado",
+    "inicio": "2025-10-29T13:45:54.535Z",
+    "fecha": "2025-10-29",
+    "items": [
+      {
+        "id": "lom",
+        "nombre": "Lomito",
+        "precio": 900000,
+        "cant": 1
+      },
+      {
+        "id": "bur",
+        "nombre": "Hamburguesa",
+        "precio": 900000,
+        "cant": 1
+      },
+      {
+        "id": "coc",
+        "nombre": "Coca Cola",
+        "precio": 280000,
+        "cant": 2
+      }
+    ],
+    "total": 2360000,
+    "mozo": "Wanda Nara",
+    "workflow": "entregado",
+    "id": 17,
+    "descuento": 0,
+    "totalCobrado": 2360000,
+    "pagos": [
+      {
+        "tipo": "Tarjeta",
+        "obs": "",
+        "monto": 2360000
+      }
+    ],
+    "cierre": "2025-10-29T13:47:17.083Z"
+  },
+  {
+    "mesa": 2,
+    "tipo": "SALON",
+    "estado": "cerrado",
+    "inicio": "2025-10-29T13:46:06.242Z",
+    "fecha": "2025-10-29",
+    "items": [
+      {
+        "id": "pas",
+        "nombre": "Pastas",
+        "precio": 500000,
+        "cant": 1
+      },
+      {
+        "id": "loc",
+        "nombre": "Locro",
+        "precio": 380000,
+        "cant": 1
+      }
+    ],
+    "total": 880000,
+    "mozo": "Mona Flores",
+    "workflow": "entregado",
+    "id": 18,
+    "descuento": 0,
+    "totalCobrado": 880000,
+    "pagos": [
+      {
+        "tipo": "Transferencia",
+        "obs": "",
+        "monto": 880000
+      }
+    ],
+    "cierre": "2025-10-29T13:47:26.373Z"
+  },
+  {
+    "mesa": 3,
+    "tipo": "SALON",
+    "estado": "cerrado",
+    "inicio": "2025-10-29T13:46:13.614Z",
+    "fecha": "2025-10-29",
+    "items": [
+      {
+        "id": "coc",
+        "nombre": "Coca Cola",
+        "precio": 280000,
+        "cant": 1
+      },
+      {
+        "id": "agu",
+        "nombre": "Agua mineral",
+        "precio": 300000,
+        "cant": 1
+      }
+    ],
+    "total": 580000,
+    "mozo": "Maxi Lopez",
+    "workflow": "entregado",
+    "id": 19,
+    "descuento": 0,
+    "totalCobrado": 580000,
+    "pagos": [
+      {
+        "tipo": "Efectivo",
+        "obs": "",
+        "monto": 580000
+      }
+    ],
+    "cierre": "2025-10-29T13:47:32.299Z"
+  },
+  {
+    "mesa": 1,
+    "tipo": "SALON",
+    "estado": "cerrado",
+    "inicio": "2025-10-29T15:34:31.500Z",
+    "fecha": "2025-10-29",
+    "items": [
+      {
+        "id": "gin",
+        "nombre": "Gin tonic",
+        "precio": 600000,
+        "cant": 1
+      },
+      {
+        "id": "pas",
+        "nombre": "Pastas",
+        "precio": 500000,
+        "cant": 1
+      }
+    ],
+    "total": 1100000,
+    "mozo": "Maxi Lopez",
+    "workflow": "pendiente",
+    "id": 20,
+    "pagos": [
+      {
+        "tipo": "Efectivo",
+        "obs": "",
+        "monto": 1100000
+      }
+    ],
+    "descuento": 0,
+    "totalCobrado": 1100000,
+    "cierre": "2025-10-29T16:08:05.612Z"
+  },
+  {
+    "mesa": 2,
+    "tipo": "SALON",
+    "estado": "cerrado",
+    "inicio": "2025-10-29T15:37:15.737Z",
+    "fecha": "2025-10-29",
+    "items": [
+      {
+        "id": "loc",
+        "nombre": "Locro",
+        "precio": 380000,
+        "cant": 1
+      },
+      {
+        "id": "pap",
+        "nombre": "Papas fritas",
+        "precio": 800000,
+        "cant": 1
+      }
+    ],
+    "total": 1180000,
+    "mozo": "",
+    "workflow": "pendiente",
+    "id": 21,
+    "pagos": [
+      {
+        "tipo": "Efectivo",
+        "obs": "",
+        "monto": 1180000
+      }
+    ],
+    "descuento": 0,
+    "totalCobrado": 1180000,
+    "cierre": "2025-10-29T15:44:19.573Z"
+  },
+  {
+    "mesa": 1,
+    "tipo": "SALON",
+    "estado": "cerrado",
+    "inicio": "2025-10-29T16:08:16.921Z",
+    "fecha": "2025-10-29",
+    "items": [
+      {
+        "id": "pas",
+        "nombre": "Pastas",
+        "precio": 500000,
+        "cant": 1
+      },
+      {
+        "id": "loc",
+        "nombre": "Locro",
+        "precio": 380000,
+        "cant": 1
+      }
+    ],
+    "total": 880000,
+    "mozo": "Maxi Lopez",
+    "workflow": "pendiente",
+    "id": 22,
+    "descuento": 0,
+    "totalCobrado": 880000,
+    "pagos": [
+      {
+        "tipo": "Efectivo",
+        "obs": "",
+        "monto": 880000
+      }
+    ],
+    "cierre": "2025-10-29T16:08:32.017Z"
+  },
+  {
+    "mesa": 2,
+    "tipo": "SALON",
+    "estado": "cerrado",
+    "inicio": "2025-10-29T16:08:23.460Z",
+    "fecha": "2025-10-29",
+    "items": [
+      {
+        "id": "pap",
+        "nombre": "Papas fritas",
+        "precio": 800000,
+        "cant": 1
+      },
+      {
+        "id": "coc",
+        "nombre": "Coca Cola",
+        "precio": 280000,
+        "cant": 1
+      }
+    ],
+    "total": 1080000,
+    "mozo": "",
+    "workflow": "pendiente",
+    "id": 23,
+    "pagos": [
+      {
+        "tipo": "Efectivo",
+        "obs": "",
+        "monto": 1080000
+      }
+    ],
+    "descuento": 0,
+    "totalCobrado": 1080000,
+    "cierre": "2025-10-29T16:08:49.674Z"
+  },
+  {
+    "mesa": 1,
+    "tipo": "SALON",
+    "estado": "cerrado",
+    "inicio": "2025-10-29T16:59:33.372Z",
+    "fecha": "2025-10-29",
+    "items": [
+      {
+        "id": "pas",
+        "nombre": "Pastas",
+        "precio": 500000,
+        "cant": 1
+      },
+      {
+        "id": "loc",
+        "nombre": "Locro",
+        "precio": 380000,
+        "cant": 1
+      }
+    ],
+    "total": 880000,
+    "mozo": "",
+    "workflow": "pendiente",
+    "id": 24,
+    "pagos": [
+      {
+        "tipo": "Efectivo",
+        "obs": "",
+        "monto": 880000
+      }
+    ],
+    "descuento": 0,
+    "totalCobrado": 880000,
+    "cierre": "2025-10-29T16:59:45.529Z"
+  },
+  {
+    "mesa": 1,
+    "tipo": "SALON",
+    "estado": "cerrado",
+    "inicio": "2025-10-29T17:00:02.352Z",
+    "fecha": "2025-10-29",
+    "items": [
+      {
+        "id": "pap",
+        "nombre": "Papas fritas",
+        "precio": 800000,
+        "cant": 1
+      },
+      {
+        "id": "coc",
+        "nombre": "Coca Cola",
+        "precio": 280000,
+        "cant": 1
+      }
+    ],
+    "total": 1080000,
+    "mozo": "Mona Flores",
+    "workflow": "pendiente",
+    "id": 25,
+    "pagos": [
+      {
+        "tipo": "Efectivo",
+        "obs": "",
+        "monto": 1080000
+      }
+    ],
+    "descuento": 0,
+    "totalCobrado": 1080000,
+    "cierre": "2025-10-29T17:00:12.980Z"
+  },
+  {
+    "mesa": 1,
+    "tipo": "SALON",
+    "estado": "cerrado",
+    "inicio": "2025-10-29T17:15:24.711Z",
+    "fecha": "2025-10-29",
+    "items": [
+      {
+        "id": "gin",
+        "nombre": "Gin tonic",
+        "precio": 600000,
+        "cant": 1
+      },
+      {
+        "id": "pas",
+        "nombre": "Pastas",
+        "precio": 500000,
+        "cant": 1
+      }
+    ],
+    "total": 1100000,
+    "mozo": "",
+    "workflow": "pendiente",
+    "id": 26,
+    "pagos": [
+      {
+        "tipo": "Efectivo",
+        "obs": "",
+        "monto": 1100000
+      }
+    ],
+    "descuento": 0,
+    "totalCobrado": 1100000,
+    "cierre": "2025-10-29T17:15:37.348Z"
+  },
+  {
+    "mesa": 1,
+    "tipo": "SALON",
+    "estado": "cerrado",
+    "inicio": "2025-10-29T17:15:53.000Z",
+    "fecha": "2025-10-29",
+    "items": [
+      {
+        "id": "pas",
+        "nombre": "Pastas",
+        "precio": 500000,
+        "cant": 2
+      }
+    ],
+    "total": 1000000,
+    "mozo": "",
+    "workflow": "pendiente",
+    "id": 27,
+    "descuento": 0,
+    "totalCobrado": 1000000,
+    "pagos": [
+      {
+        "tipo": "Efectivo",
+        "obs": "",
+        "monto": 1000000
+      }
+    ],
+    "cierre": "2025-10-29T17:16:00.988Z"
+  },
+  {
+    "mesa": 1,
+    "tipo": "SALON",
+    "estado": "cerrado",
+    "inicio": "2025-10-29T17:49:05.618Z",
+    "fecha": "2025-10-29",
+    "items": [
+      {
+        "id": "pas",
+        "nombre": "Pastas",
+        "precio": 500000,
+        "cant": 1
+      },
+      {
+        "id": "loc",
+        "nombre": "Locro",
+        "precio": 380000,
+        "cant": 1
+      }
+    ],
+    "total": 880000,
+    "mozo": "",
+    "workflow": "pendiente",
+    "id": 28,
+    "descuento": 0,
+    "totalCobrado": 880000,
+    "pagos": [
+      {
+        "tipo": "Efectivo",
+        "obs": "",
+        "monto": 880000
+      }
+    ],
+    "cierre": "2025-10-29T17:49:22.104Z"
+  },
+  {
+    "mesa": 2,
+    "tipo": "SALON",
+    "estado": "cerrado",
+    "inicio": "2025-10-29T17:49:08.663Z",
+    "fecha": "2025-10-29",
+    "items": [
+      {
+        "id": "gin",
+        "nombre": "Gin tonic",
+        "precio": 600000,
+        "cant": 1
+      },
+      {
+        "id": "pap",
+        "nombre": "Papas fritas",
+        "precio": 800000,
+        "cant": 1
+      }
+    ],
+    "total": 1400000,
+    "mozo": "",
+    "workflow": "pendiente",
+    "id": 29,
+    "pagos": [
+      {
+        "tipo": "Efectivo",
+        "obs": "",
+        "monto": 1400000
+      }
+    ],
+    "descuento": 0,
+    "totalCobrado": 1400000,
+    "cierre": "2025-10-29T17:49:35.011Z"
+  },
+  {
+    "mesa": 1,
+    "tipo": "SALON",
+    "estado": "cerrado",
+    "inicio": "2025-10-29T17:50:07.771Z",
+    "fecha": "2025-10-29",
+    "items": [
+      {
+        "id": "agu",
+        "nombre": "Agua mineral",
+        "precio": 300000,
+        "cant": 1
+      }
+    ],
+    "total": 300000,
+    "mozo": "",
+    "workflow": "pendiente",
+    "id": 30,
+    "pagos": [
+      {
+        "tipo": "Efectivo",
+        "obs": "",
+        "monto": 300000
+      }
+    ],
+    "descuento": 0,
+    "totalCobrado": 300000,
+    "cierre": "2025-10-29T17:50:34.516Z"
+  },
+  {
+    "mesa": 1,
+    "tipo": "SALON",
+    "estado": "cerrado",
+    "inicio": "2025-10-30T13:28:08.269Z",
+    "fecha": "2025-10-30",
+    "items": [
+      {
+        "id": "gin",
+        "nombre": "Gin tonic",
+        "precio": 600000,
+        "cant": 1
+      },
+      {
+        "id": "loc",
+        "nombre": "Locro",
+        "precio": 380000,
+        "cant": 1
+      }
+    ],
+    "total": 980000,
+    "mozo": "Wanda Nara",
+    "workflow": "listo",
+    "id": 31,
+    "descuento": 0,
+    "totalCobrado": 980000,
+    "pagos": [
+      {
+        "tipo": "Transferencia",
+        "obs": "",
+        "monto": 980000
+      }
+    ],
+    "cierre": "2025-10-30T13:30:15.434Z"
+  },
+  {
+    "mesa": 2,
+    "tipo": "SALON",
+    "estado": "cerrado",
+    "inicio": "2025-10-30T13:28:15.551Z",
+    "fecha": "2025-10-30",
+    "items": [
+      {
+        "id": "pap",
+        "nombre": "Papas fritas",
+        "precio": 800000,
+        "cant": 1
+      },
+      {
+        "id": "coc",
+        "nombre": "Coca Cola",
+        "precio": 280000,
+        "cant": 1
+      }
+    ],
+    "total": 1080000,
+    "mozo": "Maxi Lopez",
+    "workflow": "listo",
+    "id": 32,
+    "pagos": [
+      {
+        "tipo": "Transferencia",
+        "obs": "",
+        "monto": 1080000
+      }
+    ],
+    "descuento": 0,
+    "totalCobrado": 1080000,
+    "cierre": "2025-10-30T13:31:06.058Z"
+  },
+  {
+    "mesa": 3,
+    "tipo": "SALON",
+    "estado": "cerrado",
+    "inicio": "2025-10-30T13:28:22.054Z",
+    "fecha": "2025-10-30",
+    "items": [
+      {
+        "id": "pas",
+        "nombre": "Pastas",
+        "precio": 500000,
+        "cant": 2
+      }
+    ],
+    "total": 1000000,
+    "mozo": "Mona Flores",
+    "workflow": "listo",
+    "id": 33,
+    "pagos": [
+      {
+        "tipo": "Transferencia",
+        "obs": "",
+        "monto": 1000000
+      }
+    ],
+    "descuento": 0,
+    "totalCobrado": 1000000,
+    "cierre": "2025-10-30T13:29:51.852Z"
+  },
+  {
+    "mesa": 1,
+    "tipo": "SALON",
+    "estado": "cerrado",
+    "inicio": "2025-10-30T13:31:15.853Z",
+    "fecha": "2025-10-30",
+    "items": [
+      {
+        "id": "pas",
+        "nombre": "Pastas",
+        "precio": 500000,
+        "cant": 1
+      },
+      {
+        "id": "agu",
+        "nombre": "Agua mineral",
+        "precio": 300000,
+        "cant": 1
+      }
+    ],
+    "total": 800000,
+    "mozo": "",
+    "workflow": "pendiente",
+    "id": 34,
+    "descuento": 0,
+    "totalCobrado": 800000,
+    "pagos": [
+      {
+        "tipo": "Efectivo",
+        "obs": "",
+        "monto": 800000
+      }
+    ],
+    "cierre": "2025-10-30T13:31:26.768Z"
+  },
+  {
+    "mesa": 1,
+    "tipo": "SALON",
+    "estado": "cerrado",
+    "inicio": "2025-10-30T14:14:05.112Z",
+    "fecha": "2025-10-30",
+    "items": [
+      {
+        "id": "gin",
+        "nombre": "Gin tonic",
+        "precio": 600000,
+        "cant": 1
+      },
+      {
+        "id": "pas",
+        "nombre": "Pastas",
+        "precio": 500000,
+        "cant": 1
+      }
+    ],
+    "total": 1100000,
+    "mozo": "Wanda Nara",
+    "workflow": "listo",
+    "id": 35,
+    "pagos": [
+      {
+        "tipo": "Tarjeta",
+        "obs": "",
+        "monto": 1100000
+      }
+    ],
+    "descuento": 0,
+    "totalCobrado": 1100000,
+    "cierre": "2025-10-30T14:16:18.643Z"
+  },
+  {
+    "mesa": 2,
+    "tipo": "SALON",
+    "estado": "cerrado",
+    "inicio": "2025-10-30T14:14:54.328Z",
+    "fecha": "2025-10-30",
+    "items": [
+      {
+        "id": "pap",
+        "nombre": "Papas fritas",
+        "precio": 800000,
+        "cant": 1
+      },
+      {
+        "id": "loc",
+        "nombre": "Locro",
+        "precio": 380000,
+        "cant": 1
+      }
+    ],
+    "total": 1180000,
+    "mozo": "Maxi Lopez",
+    "workflow": "listo",
+    "id": 36,
+    "descuento": 0,
+    "totalCobrado": 1180000,
+    "pagos": [
+      {
+        "tipo": "Transferencia",
+        "obs": "",
+        "monto": 1180000
+      }
+    ],
+    "cierre": "2025-10-30T14:21:43.200Z"
+  },
+  {
+    "mesa": 3,
+    "tipo": "SALON",
+    "estado": "cerrado",
+    "inicio": "2025-10-30T14:14:59.637Z",
+    "fecha": "2025-10-30",
+    "items": [
+      {
+        "id": "coc",
+        "nombre": "Coca Cola",
+        "precio": 280000,
+        "cant": 1
+      },
+      {
+        "id": "agu",
+        "nombre": "Agua mineral",
+        "precio": 300000,
+        "cant": 1
+      }
+    ],
+    "total": 580000,
+    "mozo": "Mona Flores",
+    "workflow": "listo",
+    "id": 37,
+    "descuento": 0,
+    "totalCobrado": 580000,
+    "pagos": [
+      {
+        "tipo": "Efectivo",
+        "obs": "",
+        "monto": 580000
+      }
+    ],
+    "cierre": "2025-10-30T14:17:00.174Z"
+  },
+  {
+    "mesa": 4,
+    "tipo": "SALON",
+    "estado": "cerrado",
+    "inicio": "2025-10-30T14:15:05.285Z",
+    "fecha": "2025-10-30",
+    "items": [
+      {
+        "id": "pas",
+        "nombre": "Pastas",
+        "precio": 500000,
+        "cant": 1
+      },
+      {
+        "id": "loc",
+        "nombre": "Locro",
+        "precio": 380000,
+        "cant": 1
+      }
+    ],
+    "total": 880000,
+    "mozo": "Mona Flores",
+    "workflow": "listo",
+    "id": 38,
+    "pagos": [
+      {
+        "tipo": "Efectivo",
+        "obs": "",
+        "monto": 880000
+      }
+    ],
+    "descuento": 0,
+    "totalCobrado": 880000,
+    "cierre": "2025-10-30T14:20:40.429Z"
+  },
+  {
+    "mesa": 1,
+    "tipo": "SALON",
+    "estado": "cerrado",
+    "inicio": "2025-10-30T14:38:32.556Z",
+    "fecha": "2025-10-30",
+    "items": [
+      {
+        "id": "gin",
+        "nombre": "Gin tonic",
+        "precio": 600000,
+        "cant": 1
+      }
+    ],
+    "total": 600000,
+    "mozo": "Wanda Nara",
+    "workflow": "pendiente",
+    "id": 39,
+    "descuento": 0,
+    "totalCobrado": 600000,
+    "pagos": [
+      {
+        "tipo": "Transferencia",
+        "obs": "",
+        "monto": 600000
+      }
+    ],
+    "cierre": "2025-10-30T14:38:46.846Z"
+  },
+  {
+    "mesa": 1,
+    "tipo": "SALON",
+    "estado": "abierto",
+    "inicio": "2025-10-30T22:17:52.108Z",
+    "fecha": "2025-10-30",
+    "items": [
+      {
+        "id": "gin",
+        "nombre": "Gin tonic",
+        "precio": 600000,
+        "cant": 1
+      },
+      {
+        "id": "pas",
+        "nombre": "Pastas",
+        "precio": 500000,
+        "cant": 1
+      }
+    ],
+    "total": 1100000,
+    "mozo": "",
+    "workflow": "listo",
+    "id": 40,
+    "nota": "Sin mayonesa, Sin lechuga"
+  },
+  {
+    "mesa": 2,
+    "tipo": "SALON",
+    "estado": "abierto",
+    "inicio": "2025-10-30T22:17:56.578Z",
+    "fecha": "2025-10-30",
+    "items": [
+      {
+        "id": "loc",
+        "nombre": "Locro",
+        "precio": 380000,
+        "cant": 1
+      },
+      {
+        "id": "pap",
+        "nombre": "Papas fritas",
+        "precio": 800000,
+        "cant": 1
+      }
+    ],
+    "total": 1180000,
+    "mozo": "",
+    "workflow": "listo",
+    "id": 41
+  }
+]

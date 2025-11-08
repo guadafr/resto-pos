@@ -1,0 +1,66 @@
+[
+  {
+    "id": "gin",
+    "nombre": "Gin tonic",
+    "precio": 600000,
+    "stock": 14,
+    "categoria": "Bebidas",
+    "trackStock": true
+  },
+  {
+    "id": "pas",
+    "nombre": "Pastas",
+    "precio": 500000,
+    "stock": 0,
+    "categoria": "Platos",
+    "trackStock": false
+  },
+  {
+    "id": "loc",
+    "nombre": "Locro",
+    "precio": 380000,
+    "stock": 0,
+    "categoria": "Platos",
+    "trackStock": false
+  },
+  {
+    "id": "pap",
+    "nombre": "Papas fritas",
+    "precio": 800000,
+    "stock": 0,
+    "categoria": "Entradas",
+    "trackStock": false
+  },
+  {
+    "id": "coc",
+    "nombre": "Coca Cola",
+    "precio": 280000,
+    "stock": 43,
+    "categoria": "Bebidas",
+    "trackStock": true
+  },
+  {
+    "id": "agu",
+    "nombre": "Agua mineral",
+    "precio": 300000,
+    "stock": 56,
+    "categoria": "Bebidas",
+    "trackStock": true
+  },
+  {
+    "id": "lom",
+    "nombre": "Lomito",
+    "precio": 900000,
+    "stock": 0,
+    "categoria": "Platos",
+    "trackStock": false
+  },
+  {
+    "id": "bur",
+    "nombre": "Hamburguesa",
+    "precio": 900000,
+    "stock": 0,
+    "categoria": "Platos",
+    "trackStock": false
+  }
+]

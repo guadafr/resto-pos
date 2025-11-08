@@ -1,0 +1,22 @@
+[
+  {
+    "id": "1",
+    "nombre": "Laura",
+    "activo": true
+  },
+  {
+    "id": "2",
+    "nombre": "Wanda Nara",
+    "activo": true
+  },
+  {
+    "id": "3",
+    "nombre": "Maxi Lopez",
+    "activo": true
+  },
+  {
+    "id": "4",
+    "nombre": "Mona Flores",
+    "activo": true
+  }
+]
