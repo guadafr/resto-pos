@@ -134,14 +134,41 @@
 </dialog>
 
 <script>
-  // 👉 CONFIGURA TU IP/PUERTO
-  const SERVER = 'http://192.168.1.53:3002';
-  const api = (p, opt={}) => fetch(SERVER + p, Object.assign({headers:{'Content-Type':'application/json'}}, opt));
-  let SERVER_OK = false;
-  async function ensureServer(){
-    try{ const r = await api('/api/ping'); SERVER_OK = r.ok; } catch { SERVER_OK = false; }
-    return SERVER_OK;
-  }
+  // 👉 CONFIGURA TU IP/PUERT
+
+
+
+
+// === Server config (Render-friendly) ===
+const savedHost = localStorage.getItem('restopos_server_host');   // opcional
+const savedPort = localStorage.getItem('restopos_server_port');   // opcional
+
+let SERVER;
+const IS_LOCAL_HOST = ['localhost','127.0.0.1','::1'].includes(location.hostname);
+
+// Si la página está en HTTPS, siempre usar el mismo origen (para evitar Mixed Content).
+if (location.protocol === 'https:') {
+  SERVER = location.origin; // ej: https://resto-pos.onrender.com
+} else if (IS_LOCAL_HOST) {
+  // Página por HTTP en local: permitir host/puerto custom (default 3002)
+  const host = savedHost || 'localhost';
+  const port = Number(savedPort) || 3002;
+  SERVER = `${location.protocol}//${host}:${port}`;
+} else {
+  // Página por HTTP pero no local (poco común): usar mismo origen
+  SERVER = location.origin;
+}
+
+console.log('API ->', SERVER);
+
+// Helper para llamar a la API
+const api = (p, opt = {}) =>
+  fetch(`${SERVER}${p}`, Object.assign({ headers: { 'Content-Type': 'application/json' } }, opt));
+
+
+
+
+
 </script>
 
 <script>
