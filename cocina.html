@@ -54,19 +54,60 @@
 </main>
 
 <script>
-  // === CONFIGURÁ TU SERVER IGUAL QUE EN ADMIN/MOZO ===
-  const SERVER_HOST = localStorage.getItem('restopos_server_host') || location.hostname || 'localhost';
-  const SERVER_PORT = Number(localStorage.getItem('restopos_server_port') || 3002);
-  const SERVER = `${location.protocol}//${SERVER_HOST}:${SERVER_PORT}`;
-  const api = (p, opt={}) => fetch(SERVER + p, Object.assign({headers:{'Content-Type':'application/json'}}, opt));
+  // ========== SERVER CONFIG (anti Mixed Content) ==========
+  const savedHost = localStorage.getItem('restopos_server_host');   // opcional
+  const savedPort = localStorage.getItem('restopos_server_port');   // opcional
+  const IS_LOCAL_HOST = ['localhost','127.0.0.1','::1'].includes(location.hostname);
 
-  // Helpers
+  let SERVER;
+  if (location.protocol === 'https:') {
+    // Si la página está en https (Render), usamos SIEMPRE mismo origen https
+    SERVER = location.origin; // ej: https://resto-pos.onrender.com
+  } else if (IS_LOCAL_HOST) {
+    // Página local http: permitir host/puerto custom (por defecto 3002)
+    const host = savedHost || 'localhost';
+    const port = Number(savedPort) || 3002;
+    SERVER = `${location.protocol}//${host}:${port}`;
+  } else {
+    // Página http pero no localhost: mismo origen
+    SERVER = location.origin;
+  }
+
+  console.log('[COCINA] API →', SERVER);
+
+  // Helper fetch
+  const api = (p, opt = {}) =>
+    fetch(`${SERVER}${p}`, Object.assign({ headers: { 'Content-Type': 'application/json' } }, opt));
+
+  // Healthcheck con cache de 5s
+  let SERVER_OK = false;
+  let _pongTs = 0;
+  async function ensureServer() {
+    const now = Date.now();
+    if (now - _pongTs < 5000) return SERVER_OK;
+    try {
+      const r = await api('/api/ping');
+      SERVER_OK = r.ok;
+    } catch { SERVER_OK = false; }
+    _pongTs = now;
+    return SERVER_OK;
+  }
+
+  // ========== HELPERS UI ==========
   const $ = s => document.querySelector(s);
-  function money(n){ return '$ '+(n/100).toFixed(2); }
+  function money(n){ return '$ ' + ((n||0)/100).toFixed(2); }
+  function toast(msg){
+    const d=document.createElement('div');
+    d.textContent=msg;
+    d.style.cssText='position:fixed;right:12px;bottom:12px;background:#1e293b;color:#e8eef7;padding:10px 12px;border:1px solid #2b3b59;border-radius:10px;z-index:99999';
+    document.body.appendChild(d); setTimeout(()=>d.remove(), 3000);
+  }
 
-  // --- CARD DE PEDIDO ---
+  // ========== CARD DE PEDIDO ==========
   function cardHTML(o){
-    const rows = (o.items||[]).map(it=>`<tr><td>${it.cant} x ${it.nombre}</td><td class="right">${money(it.precio*it.cant)}</td></tr>`).join('');
+    const rows = (o.items||[])
+      .map(it => `<tr><td>${it.cant} × ${it.nombre}</td><td class="right">${money((it.precio||0)*it.cant)}</td></tr>`)
+      .join('');
     const nota = (o.nota && String(o.nota).trim())
       ? `<div class="noteBox">📝 ${o.nota}</div>`
       : '';
@@ -75,7 +116,7 @@
         <div class="meta">
           Mesa ${o.mesa ?? '-'} · ${o.mozo || '-'} · ${new Date(o.inicio).toLocaleTimeString()}
           <span class="tag">${o.tipo||''}</span>
-          <span class="tag">Total ${money((o.total)||0)}</span>
+          <span class="tag">Total ${money(o.total||0)}</span>
         </div>
         ${nota}
         <table><tbody>${rows}</tbody></table>
@@ -89,19 +130,25 @@
       </div>`;
   }
 
-  // --- CARGA DE PEDIDOS ABIERTOS ---
+  // ========== DATA ==========
   async function fetchOpenOrders(){
+    if (!(await ensureServer())) {
+      console.warn('[COCINA] Servidor offline: no se pueden listar pedidos abiertos.');
+      return [];
+    }
     const r = await api('/api/orders?estado=abierto');
+    if (!r.ok) return [];
     const j = await r.json().catch(()=>({orders:[]}));
     return (j.orders||[]).map(o=>{
       o.workflow = o.workflow || 'pendiente';
-      o.total = o.total || (o.items||[]).reduce((a,b)=>a + (b.precio||0)*(b.cant||0),0);
+      o.total = o.total || (o.items||[]).reduce((a,b)=> a + (b.precio||0)*(b.cant||0), 0);
       o.nota = o.nota || '';
       return o;
     });
   }
 
   async function setWorkflow(id, workflow){
+    if (!(await ensureServer())) { toast('Servidor offline'); return false; }
     const r = await api(`/api/orders/${id}/status`, {
       method:'POST',
       body: JSON.stringify({ patch:{ workflow } })
@@ -112,10 +159,10 @@
     return true;
   }
 
-  // --- IMPRESIÓN ---
+  // ========== IMPRESIÓN ==========
   function printCocina(o){
     const w=window.open('','_blank','width=400,height=600');
-    const rows=(o.items||[]).map(it=>`<div>${it.cant} x ${it.nombre}</div>`).join('');
+    const rows=(o.items||[]).map(it=>`<div>${it.cant} × ${it.nombre}</div>`).join('');
     const fecha=new Date(o.cierre||o.inicio).toLocaleString();
     const nota = (o.nota && String(o.nota).trim())
       ? `<div class="muted" style="margin:6px 0;white-space:pre-wrap;border:1px dashed #666;padding:4px">📝 ${o.nota}</div>`
@@ -130,47 +177,60 @@
     w.document.close();
   }
 
-  // --- RENDER DE COLUMNAS ---
+  // ========== RENDER ==========
   async function render(){
     const list = await fetchOpenOrders();
-    const pend = list.filter(o=>o.workflow==='pendiente');
-    const prep = list.filter(o=>o.workflow==='enprep');
+
+    const pend  = list.filter(o=>o.workflow==='pendiente');
+    const prep  = list.filter(o=>o.workflow==='enprep');
     const listo = list.filter(o=>o.workflow==='listo');
 
-    $('#colPend').innerHTML = pend.map(cardHTML).join('');
-    $('#colPrep').innerHTML = prep.map(cardHTML).join('');
-    $('#colListo').innerHTML = listo.map(cardHTML).join('');
-    $('#cntPend').textContent = pend.length;
-    $('#cntPrep').textContent = prep.length;
+    $('#colPend').innerHTML  = pend.map(cardHTML).join('') || '<div class="muted" style="padding:8px">Sin pedidos</div>';
+    $('#colPrep').innerHTML  = prep.map(cardHTML).join('') || '<div class="muted" style="padding:8px">Sin pedidos</div>';
+    $('#colListo').innerHTML = listo.map(cardHTML).join('') || '<div class="muted" style="padding:8px">Sin pedidos</div>';
+
+    $('#cntPend').textContent  = pend.length;
+    $('#cntPrep').textContent  = prep.length;
     $('#cntListo').textContent = listo.length;
 
-    // botones de acción
+    // Wire de acciones
     document.querySelectorAll('.card').forEach(card=>{
       const id = Number(card.dataset.id);
       const data = list.find(o=>o.id===id);
       card.querySelector('.act-print').onclick = ()=> printCocina(data);
-      card.querySelector('.act-pend').onclick  = async()=>{ await setWorkflow(id,'pendiente'); render(); };
-      card.querySelector('.act-prep').onclick  = async()=>{ await setWorkflow(id,'enprep'); render(); };
-      card.querySelector('.act-listo').onclick = async()=>{ await setWorkflow(id,'listo'); render(); };
-      card.querySelector('.act-entregado').onclick = async()=>{ await setWorkflow(id,'entregado'); render(); };
+      card.querySelector('.act-pend').onclick  = async()=>{ if(await setWorkflow(id,'pendiente')) render(); };
+      card.querySelector('.act-prep').onclick  = async()=>{ if(await setWorkflow(id,'enprep')) render(); };
+      card.querySelector('.act-listo').onclick = async()=>{ if(await setWorkflow(id,'listo')) render(); };
+      card.querySelector('.act-entregado').onclick = async()=>{ if(await setWorkflow(id,'entregado')) render(); };
     });
   }
 
-  // botón refrescar
+  // Botón refrescar manual
   document.getElementById('btnRefrescar').onclick = render;
 
-  // SSE: refresco en vivo
-  try{
-    const es = new EventSource(SERVER + '/api/events');
-    es.addEventListener('orders_changed', render);
-    es.addEventListener('order_workflow', render);
-    es.addEventListener('order_closed', render);
-    es.addEventListener('hello', e=>console.log('SSE cocina ok', e.data));
-    es.onerror = ()=>console.warn('SSE desconectado…');
-  }catch(e){ console.warn('SSE no disponible', e); }
+  // ========== BOOT + SSE ==========
+  (async function boot(){
+    // aviso visual si el server está caído
+    if (!(await ensureServer())) {
+      toast('Servidor offline · mostrando vacío');
+    }
+    await render();
 
-  // boot
-  render();
+    // SSE (solo si hay server)
+    try{
+      if (await ensureServer()) {
+        const es = new EventSource(SERVER + '/api/events');
+        es.addEventListener('orders_changed', render);
+        es.addEventListener('order_workflow', render);
+        es.addEventListener('order_closed', render);
+        es.addEventListener('hello', e=>console.log('SSE cocina ok', e.data));
+        es.onerror = ()=>console.warn('SSE desconectado…');
+      }
+    }catch(e){ console.warn('SSE no disponible', e); }
+  })();
 </script>
+
+
+
 </body>
 </html>
