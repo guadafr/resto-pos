@@ -294,29 +294,34 @@
   </section>
 </main>
 
-<!-- === Server config === -->
 <script>
+
+<!-- === Server config === -->
+
+
+
 // === Server config (Render-friendly) ===
 const savedHost = localStorage.getItem('restopos_server_host');   // opcional
 const savedPort = localStorage.getItem('restopos_server_port');   // opcional
 
 let SERVER;
+const IS_LOCAL = ['localhost','127.0.0.1','::1'].includes(location.hostname);
 
 // Si NO estamos en localhost (o sea, en Render/producción) => usar mismo origen sin puerto.
-if (location.hostname !== 'localhost') {
+if (!IS_LOCAL) {
   SERVER = location.origin; // ej: https://restopos-b6rd.onrender.com
 } else {
   // Modo local: permitir host/puerto custom, default 3002
   const host = savedHost || 'localhost';
   const port = Number(savedPort) || 3002;
-  SERVER = ${location.protocol}//${host}:${port};
+  SERVER = `${location.protocol}//${host}:${port}`;
 }
 
 console.log('API ->', SERVER);
 
 // Helper para llamar a la API
 const api = (p, opt = {}) =>
-  fetch(${SERVER}${p}, Object.assign({ headers: { 'Content-Type': 'application/json' } }, opt));
+  fetch(`${SERVER}${p}`, Object.assign({ headers: { 'Content-Type': 'application/json' } }, opt));
 
 // Healthcheck
 let SERVER_OK = false;
@@ -335,12 +340,6 @@ async function ensureServer() {
   return SERVER_OK;
 }
 
-
-
-
-</script>
-
-<script>
 // === CONFIG merge ===
 let CONFIG = { restaurantName:'Mi Restaurante', adminPin:'1234', tables:20, autoPrintKitchenOnSave:false, autoPrintKitchenOnCharge:true };
 async function loadConfigMerged(){
@@ -417,27 +416,21 @@ function mergeBoxes(serverBox, localShadow){
   if (!localShadow) return normalizeBox(serverBox);
   const s = normalizeBox(serverBox);
   const l = normalizeBox(localShadow);
-  // Sumar ventas totales y por medio
   s.ventasTotal += (l.ventasTotal || 0);
   for (const k of ['efectivo','tarjeta','transferencia','qr','otros']){
     s.ventasByPay[k] = (s.ventasByPay[k]||0) + (l.ventasByPay[k]||0);
   }
-  // También ingresos/egresos si algún día los cargás como shadow
   s.ingresosTotal += (l.ingresosTotal || 0);
   s.egresosTotal  += (l.egresosTotal  || 0);
   for (const k of ['efectivo','tarjeta','transferencia','qr','otros']){
     s.ingresosByPay[k] = (s.ingresosByPay[k]||0) + (l.ingresosByPay[k]||0);
     s.egresosByPay[k]  = (s.egresosByPay[k] ||0) + (l.egresosByPay[k] ||0);
   }
-
-  // 🔹 Mezclar también los movimientos (ventas, ingresos, egresos)
   s.movs = [...(s.movs || []), ...(l.movs || [])];
-
   return s;
 }
  
 async function addVentaToLocalCash(pagos, total, meta = { fuente: 'admin', pedidoId: null }) {
-  // usar o crear caja shadow
   let box = await getLocalShadowOpenBox();
   if (!box) {
     box = {
@@ -453,14 +446,10 @@ async function addVentaToLocalCash(pagos, total, meta = { fuente: 'admin', pedid
   } else {
     box = normalizeBox(box);
   }
-
-  // sumar totales por medio y registrar movimiento
   box.ventasTotal = (box.ventasTotal || 0) + (total || 0);
   pagos.forEach(p => {
     const key = mapPagoKey(p.tipo);
     box.ventasByPay[key] = (box.ventasByPay[key] || 0) + (p.monto || 0);
-
-    // 💾 registrar movimiento de venta
     box.movs.push({
       ts: nowISO(),
       tipo: 'venta',
@@ -471,10 +460,8 @@ async function addVentaToLocalCash(pagos, total, meta = { fuente: 'admin', pedid
       pedidoId: meta.pedidoId || null
     });
   });
-
   await saveLocalShadowBox(box);
 }
-
 
 // === Datos (server + fallback) ===
 async function fetchOpenOrders(){
@@ -620,15 +607,12 @@ async function serverCashHistory(desde,hasta){
   return r.json();
 }
 async function getOpenCashBox(){
-  // 1) Intentar servidor
   let serverBox = null;
   if (await ensureServer()){
     try{ serverBox = await serverGetOpenCash(); }catch{}
   }
-  // 2) Shadow local
   const localShadow = await getLocalShadowOpenBox();
   if (serverBox || localShadow) return mergeBoxes(serverBox, localShadow);
-  // 3) Fallback local "normal"
   const boxes = await getAll('cash');
   return boxes.find(b => !b.cierre) || null;
 }
@@ -754,7 +738,7 @@ async function verDetalle(id){
   const notaHtml = (o.nota && o.nota.trim())
   ? `<div class="muted" style="margin:6px 0;white-space:pre-wrap;border:1px dashed #666;padding:4px">📝 ${o.nota}</div>`
   : '';
-document.getElementById('detMeta').insertAdjacentHTML('afterend', notaHtml);
+  document.getElementById('detMeta').insertAdjacentHTML('afterend', notaHtml);
 
   const tb = document.querySelector('#detItems tbody'); tb.innerHTML='';
   (o.items||[]).forEach(it=>{
@@ -896,9 +880,6 @@ async function cobrarDesdeAdmin(id){
   const cancelBtn = document.getElementById('admCobroCerrar');
   const printChk = document.getElementById('admPrintTicket');
 
-
-
-
   descInp.value = 0;
   adminRenderTablaPagos(pedido, [{ tipo:'Efectivo', obs:'', monto: total }]);
 
@@ -921,18 +902,14 @@ async function cobrarDesdeAdmin(id){
       return;
     }
 
-   
-      
-
-      const patch = {
-  pagos, descuento:desc,
-  total, totalCobrado:aCobrar,
-  items: pedido.items, tipo: pedido.tipo,
-  mesa: pedido.mesa, mozo: pedido.mozo,
-  cierre: nowISO(), fecha: pedido.fecha,
-  nota: (pedido.nota || '')
-};
-
+    const patch = {
+      pagos, descuento:desc,
+      total, totalCobrado:aCobrar,
+      items: pedido.items, tipo: pedido.tipo,
+      mesa: pedido.mesa, mozo: pedido.mozo,
+      cierre: nowISO(), fecha: pedido.fecha,
+      nota: (pedido.nota || '')
+    };
 
     try{
       if (await ensureServer()){
@@ -946,7 +923,7 @@ async function cobrarDesdeAdmin(id){
       }
 
       // SIEMPRE sumar a caja local (shadow)
-await addVentaToLocalCash(pagos, aCobrar, { fuente: 'admin', pedidoId: pedido.id });
+      await addVentaToLocalCash(pagos, aCobrar, { fuente: 'admin', pedidoId: pedido.id });
 
       // Persistir localmente el pedido
       Object.assign(pedido, patch, { estado:'cerrado' });
@@ -1196,47 +1173,44 @@ async function renderCaja(){
   document.getElementById('lblEfEsperado').textContent = money(efEsperado);
   document.getElementById('lblTotalCaja').textContent  = money(totalCaja);
 
- // --- Renderizar los movimientos manuales (ingreso/egreso) ---
-const tb = document.querySelector('#tblMov tbody');
-tb.innerHTML = '';
-(open.movs || [])
-  .filter(m => m.tipo === 'ingreso' || m.tipo === 'egreso')
-  .forEach(m => {
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td>${new Date(m.ts).toLocaleTimeString()}</td>
-      <td>${m.tipo}</td>
-      <td>${m.medio}</td>
-      <td>${m.desc || ''}</td>
-      <td>${money(m.monto)}</td>`;
-    tb.appendChild(tr);
-  });
-
-// --- Renderizar COBROS DEL TURNO (ventas de Admin + Mozo) ---
-const tbCob = document.querySelector('#tblCobrosTurno tbody');
-if (tbCob) {
-  tbCob.innerHTML = '';
-  let totalCobros = 0;
-
+  // Movimientos manuales
+  const tb = document.querySelector('#tblMov tbody');
+  tb.innerHTML = '';
   (open.movs || [])
-    .filter(m => m.tipo === 'venta') // <- SOLO ventas
+    .filter(m => m.tipo === 'ingreso' || m.tipo === 'egreso')
     .forEach(m => {
-      totalCobros += (m.monto || 0);
       const tr = document.createElement('tr');
       tr.innerHTML = `
         <td>${new Date(m.ts).toLocaleTimeString()}</td>
-        <td>${m.medio || '-'}</td>
+        <td>${m.tipo}</td>
+        <td>${m.medio}</td>
         <td>${m.desc || ''}</td>
-        <td>${m.fuente || '-'}</td>
-        <td>${m.pedidoId ?? '-'}</td>
-        <td class="right">${money(m.monto || 0)}</td>`;
-      tbCob.appendChild(tr);
+        <td>${money(m.monto)}</td>`;
+      tb.appendChild(tr);
     });
 
-  const totCell = document.getElementById('cobrosTurnoTotal');
-  if (totCell) totCell.textContent = money(totalCobros);
-}
-
+  // Cobros del turno
+  const tbCob = document.querySelector('#tblCobrosTurno tbody');
+  if (tbCob) {
+    tbCob.innerHTML = '';
+    let totalCobros = 0;
+    (open.movs || [])
+      .filter(m => m.tipo === 'venta')
+      .forEach(m => {
+        totalCobros += (m.monto || 0);
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+          <td>${new Date(m.ts).toLocaleTimeString()}</td>
+          <td>${m.medio || '-'}</td>
+          <td>${m.desc || ''}</td>
+          <td>${m.fuente || '-'}</td>
+          <td>${m.pedidoId ?? '-'}</td>
+          <td class="right">${money(m.monto || 0)}</td>`;
+        tbCob.appendChild(tr);
+      });
+    const totCell = document.getElementById('cobrosTurnoTotal');
+    if (totCell) totCell.textContent = money(totalCobros);
+  }
 }
 
 // Abrir caja
@@ -1498,6 +1472,9 @@ $('#cfgGuardar').onclick=async()=>{
     }
   }catch(e){}
 })();
+
 </script>
+
+
 </body>
 </html>
