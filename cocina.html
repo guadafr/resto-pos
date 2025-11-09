@@ -176,14 +176,26 @@
     </body></html>`);
     w.document.close();
   }
+function uniqueOrders(list){
+  const byId = new Set(), byCID = new Set(), out = [];
+  for (const o of list || []) {
+    const k1 = o && (o.id != null ? String(o.id) : '');
+    const k2 = o && (o.clientId || '');
+    if (k1 && byId.has(k1)) continue;
+    if (k2 && byCID.has(k2)) continue;
+    if (k1) byId.add(k1);
+    if (k2) byCID.add(k2);
+    out.push(o);
+  }
+  return out;
+}
 
   // ========== RENDER ==========
   async function render(){
-    const list = await fetchOpenOrders();
-
-    const pend  = list.filter(o=>o.workflow==='pendiente');
-    const prep  = list.filter(o=>o.workflow==='enprep');
-    const listo = list.filter(o=>o.workflow==='listo');
+    const listU = uniqueOrders(list);
+const pend  = listU.filter(o=>o.workflow==='pendiente');
+const prep  = listU.filter(o=>o.workflow==='enprep');
+const listo = listU.filter(o=>o.workflow==='listo');
 
     $('#colPend').innerHTML  = pend.map(cardHTML).join('') || '<div class="muted" style="padding:8px">Sin pedidos</div>';
     $('#colPrep').innerHTML  = prep.map(cardHTML).join('') || '<div class="muted" style="padding:8px">Sin pedidos</div>';

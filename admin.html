@@ -616,6 +616,19 @@ async function getOpenCashBox(){
   const boxes = await getAll('cash');
   return boxes.find(b => !b.cierre) || null;
 }
+function uniqueOrders(list){
+  const byId = new Set(), byCID = new Set(), out = [];
+  for (const o of list || []) {
+    const k1 = o && (o.id != null ? String(o.id) : '');
+    const k2 = o && (o.clientId || '');
+    if (k1 && byId.has(k1)) continue;
+    if (k2 && byCID.has(k2)) continue;
+    if (k1) byId.add(k1);
+    if (k2) byCID.add(k2);
+    out.push(o);
+  }
+  return out;
+}
 
 // =================== UI: Tabs ===================
 document.querySelector('.tabs').onclick=e=>{

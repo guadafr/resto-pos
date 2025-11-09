@@ -232,23 +232,41 @@ async function fetchOpenOrders(tipo){
   const all = await getAll('orders');
   return all.filter(o=>o.estado==='abierto' && (!tipo || o.tipo===tipo));
 }
+let __saving = false, __saveAgain = false;
+
 async function saveOrder(order){
-  if (await ensureServer()){
+  order.clientId = order.clientId || genCID(); // importante
+  async function doSave() {
     const r = await api('/api/orders', { method:'POST', body: JSON.stringify(order) });
-    if(!r.ok) throw new Error('save order');
-    const j = await r.json();
-    if (j && typeof j.id !== 'undefined') order.id = j.id;
+    if (!r.ok) throw new Error('save order');
+    const js = await r.json().catch(()=>({}));
+    if (js && js.order) Object.assign(order, js.order); // asegura id asignado
     return order;
   }
-  if (!order.id) order.id = await put('orders', order); else await put('orders', order);
+  if (__saving) { __saveAgain = true; return order; }
+  __saving = true;
+  try {
+    order = await doSave();
+  } finally {
+    __saving = false;
+    if (__saveAgain) { __saveAgain = false; try { order = await doSave(); } catch {} }
+  }
   return order;
 }
+
+
+
 // ⬇️ acepta también 'nota' en el payload de cobro
 async function chargeOrder(id, pagos, descuento, nota){
   const r = await api(`/api/orders/${id}/charge`, { method:'POST', body: JSON.stringify({ pagos, descuento, nota }) });
   if (!r.ok) throw new Error('charge');
   return true;
 }
+function genCID() {
+  return 'c_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+}
+
+
 
 // ======== UI: Grid de mesas ========
 async function renderGrid(){
@@ -371,9 +389,16 @@ async function loadMozos(){
 
 async function openOrder(mesa, existing){
   if(!existing){
-    currentOrder={ mesa, tipo:currentView, estado:'abierto', inicio:nowISO(), fecha:today(), items:[], total:0, mozo:'', workflow:'pendiente', nota:'' };
-    currentOrder = await saveOrder(currentOrder);
-  }else currentOrder=existing;
+  currentOrder = {
+    mesa, tipo:currentView, estado:'abierto',
+    inicio:nowISO(), fecha:today(), items:[], total:0, mozo:'', workflow:'pendiente', nota:'',
+    clientId: genCID()  // 🔴 NUEVO
+  };
+  currentOrder = await saveOrder(currentOrder);
+} else {
+  currentOrder = existing;
+  if (!currentOrder.clientId) { currentOrder.clientId = genCID(); currentOrder = await saveOrder(currentOrder); }
+}
 
   $('#tituloPedido').textContent = (mesa?`Mesa ${String(mesa).padStart(2,'0')}`:'Venta rápida')+' · '+currentView;
   await loadMozos(); $("#selMozo").value=currentOrder.mozo||$("#selMozo").value||'';

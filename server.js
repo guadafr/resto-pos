@@ -157,15 +157,46 @@ app.delete('/api/mozos/:id', async (req, res) => {
 });
 
 // ====== Pedidos ======
-app.get('/api/orders', async (req, res) => {
-  const { estado, tipo, date } = req.query || {};
-  const list = await readJSON(ORDERS_FILE, []);
-  let out = list;
-  if (estado) out = out.filter(o => String(o.estado) === String(estado));
-  if (tipo)   out = out.filter(o => String(o.tipo) === String(tipo));
-  if (date)   out = out.filter(o => String(o.fecha).slice(0, 10) === String(date).slice(0, 10));
-  res.json({ ok: true, orders: out });
+// ====== Pedidos ======
+function genId() {
+  return Math.floor(Date.now() / 1000); // número único
+}
+function genClientId() {
+  return 'c_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+}
+
+app.post('/api/orders', async (req, res) => {
+  const o = req.body || {};
+  const list = await readJSON(ORDERS_FILE, []); // donde guardás los pedidos
+
+  // Aseguramos que cada pedido tenga un identificador único
+  if (!o.clientId) o.clientId = genClientId();
+
+  // Buscamos si ya existe (por id o por clientId)
+  let idx = -1;
+  if (o.id != null) idx = list.findIndex(x => +x.id === +o.id);
+  if (idx < 0) idx = list.findIndex(x => x.clientId && x.clientId === o.clientId);
+
+  if (idx < 0) {
+    // crear nuevo pedido
+    const maxId = list.reduce((m, x) => Math.max(m, +x.id || 0), 0);
+    o.id = o.id != null ? +o.id : (maxId + 1) || genId();
+    o.estado = o.estado || 'abierto';
+    o.inicio = o.inicio || new Date().toISOString();
+    list.push(o);
+    await writeJSON(ORDERS_FILE, list);
+    broadcast('orders_changed', { id: o.id, action: 'insert' });
+    return res.json({ ok: true, order: o, id: o.id });
+  } else {
+    // actualizar (no crear copia)
+    const merged = { ...list[idx], ...o, id: (+list[idx].id || +o.id), clientId: list[idx].clientId || o.clientId };
+    list.splice(idx, 1, merged);
+    await writeJSON(ORDERS_FILE, list);
+    broadcast('orders_changed', { id: merged.id, action: 'update' });
+    return res.json({ ok: true, order: merged, id: merged.id });
+  }
 });
+
 app.get('/api/orders/open', async (_req, res) => {
   const list = await readJSON(ORDERS_FILE, []);
   res.json({ ok: true, orders: list.filter(o => o.estado === 'abierto') });
