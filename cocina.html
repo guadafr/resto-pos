@@ -54,195 +54,232 @@
 </main>
 
 <script>
-  // ========== SERVER CONFIG (anti Mixed Content) ==========
-  const savedHost = localStorage.getItem('restopos_server_host');   // opcional
-  const savedPort = localStorage.getItem('restopos_server_port');   // opcional
-  const IS_LOCAL_HOST = ['localhost','127.0.0.1','::1'].includes(location.hostname);
+/* =======================
+   SERVER CONFIG COMÚN
+   ======================= */
+// Permite override guardado:
+const savedHost = localStorage.getItem('restopos_server_host');   // ej: "192.168.1.53"
+const savedPort = localStorage.getItem('restopos_server_port');   // ej: "3002"
 
-  let SERVER;
-  if (location.protocol === 'https:') {
-    // Si la página está en https (Render), usamos SIEMPRE mismo origen https
-    SERVER = location.origin; // ej: https://resto-pos.onrender.com
-  } else if (IS_LOCAL_HOST) {
-    // Página local http: permitir host/puerto custom (por defecto 3002)
-    const host = savedHost || 'localhost';
-    const port = Number(savedPort) || 3002;
-    SERVER = `${location.protocol}//${host}:${port}`;
-  } else {
-    // Página http pero no localhost: mismo origen
-    SERVER = location.origin;
+const IS_LOCAL_HOST = ['localhost','127.0.0.1','::1'].includes(location.hostname);
+let SERVER;
+
+// Regla: si estás sirviendo esta página desde TU server Node (opción A/B),
+// dejá SERVER = location.origin. Si querés forzar IP/puerto locales, setealo
+// en localStorage y se usará (solo si la página NO está en https o el backend es https).
+if (savedHost) {
+  const port = Number(savedPort) || 3002;
+  const proto = location.protocol; // ojo con https + backend http (mixed content)
+  SERVER = `${proto}//${savedHost}:${port}`;
+} else if (location.protocol === 'https:') {
+  // en https: por defecto mismo origen (tu backend debe vivir aquí)
+  SERVER = location.origin;
+} else if (IS_LOCAL_HOST) {
+  SERVER = `${location.protocol}//localhost:${Number(savedPort)||3002}`;
+} else {
+  SERVER = location.origin;
+}
+
+console.log('[COCINA] API ->', SERVER);
+
+const api = (p, opt = {}) =>
+  fetch(`${SERVER}${p}`, Object.assign({ headers: { 'Content-Type': 'application/json' } }, opt));
+
+let SERVER_OK = false;
+let _lastPingTs = 0;
+async function ensureServer() {
+  const now = Date.now();
+  if (now - _lastPingTs < 4000) return SERVER_OK;
+  try {
+    const r = await api('/api/ping');
+    SERVER_OK = r.ok;
+  } catch {
+    SERVER_OK = false;
   }
+  _lastPingTs = now;
+  return SERVER_OK;
+}
 
-  console.log('[COCINA] API →', SERVER);
+/* =======================
+   HELPERS + UI
+   ======================= */
+const $ = s => document.querySelector(s);
+function money(n){ return '$ ' + ((n||0)/100).toFixed(2); }
 
-  // Helper fetch
-  const api = (p, opt = {}) =>
-    fetch(`${SERVER}${p}`, Object.assign({ headers: { 'Content-Type': 'application/json' } }, opt));
+function toast(msg){
+  const d=document.createElement('div');
+  d.textContent=msg;
+  d.style.cssText='position:fixed;right:12px;bottom:12px;background:#1e293b;color:#e8eef7;padding:10px 12px;border:1px solid #2b3b59;border-radius:10px;z-index:99999';
+  document.body.appendChild(d); setTimeout(()=>d.remove(), 3200);
+}
 
-  // Healthcheck con cache de 5s
-  let SERVER_OK = false;
-  let _pongTs = 0;
-  async function ensureServer() {
-    const now = Date.now();
-    if (now - _pongTs < 5000) return SERVER_OK;
-    try {
-      const r = await api('/api/ping');
-      SERVER_OK = r.ok;
-    } catch { SERVER_OK = false; }
-    _pongTs = now;
-    return SERVER_OK;
-  }
-
-  // ========== HELPERS UI ==========
-  const $ = s => document.querySelector(s);
-  function money(n){ return '$ ' + ((n||0)/100).toFixed(2); }
-  function toast(msg){
-    const d=document.createElement('div');
-    d.textContent=msg;
-    d.style.cssText='position:fixed;right:12px;bottom:12px;background:#1e293b;color:#e8eef7;padding:10px 12px;border:1px solid #2b3b59;border-radius:10px;z-index:99999';
-    document.body.appendChild(d); setTimeout(()=>d.remove(), 3000);
-  }
-
-  // ========== CARD DE PEDIDO ==========
-  function cardHTML(o){
-    const rows = (o.items||[])
-      .map(it => `<tr><td>${it.cant} × ${it.nombre}</td><td class="right">${money((it.precio||0)*it.cant)}</td></tr>`)
-      .join('');
-    const nota = (o.nota && String(o.nota).trim())
-      ? `<div class="noteBox">📝 ${o.nota}</div>`
-      : '';
-    return `
-      <div class="card" data-id="${o.id}">
-        <div class="meta">
-          Mesa ${o.mesa ?? '-'} · ${o.mozo || '-'} · ${new Date(o.inicio).toLocaleTimeString()}
-          <span class="tag">${o.tipo||''}</span>
-          <span class="tag">Total ${money(o.total||0)}</span>
-        </div>
-        ${nota}
-        <table><tbody>${rows}</tbody></table>
-        <div class="actions">
-          <button class="btn act-print">Imprimir</button>
-          <button class="btn act-pend">Pendiente</button>
-          <button class="btn act-prep">En prep</button>
-          <button class="btn act-listo">Listo</button>
-          <button class="btn act-entregado">Entregado</button>
-        </div>
-      </div>`;
-  }
-
-  // ========== DATA ==========
-  async function fetchOpenOrders(){
-    if (!(await ensureServer())) {
-      console.warn('[COCINA] Servidor offline: no se pueden listar pedidos abiertos.');
-      return [];
-    }
-    const r = await api('/api/orders?estado=abierto');
-    if (!r.ok) return [];
-    const j = await r.json().catch(()=>({orders:[]}));
-    return (j.orders||[]).map(o=>{
-      o.workflow = o.workflow || 'pendiente';
-      o.total = o.total || (o.items||[]).reduce((a,b)=> a + (b.precio||0)*(b.cant||0), 0);
-      o.nota = o.nota || '';
-      return o;
-    });
-  }
-
-  async function setWorkflow(id, workflow){
-    if (!(await ensureServer())) { toast('Servidor offline'); return false; }
-    const r = await api(`/api/orders/${id}/status`, {
-      method:'POST',
-      body: JSON.stringify({ patch:{ workflow } })
-    });
+/* =======================
+   DATA
+   ======================= */
+async function fetchOpenOrders(){
+  // Usamos el endpoint /api/orders/open (evita 404 por query si tu server difiere)
+  try{
+    if (!(await ensureServer())) throw new Error('offline');
+    const r = await api('/api/orders/open');
     if (!r.ok) {
-      const t = await r.text(); alert('No se pudo actualizar: ' + t); return false;
+      // intento alternativo al viejo patrón ?estado=abierto
+      const alt = await api('/api/orders?estado=abierto').catch(()=>null);
+      if (alt && alt.ok) {
+        const jj = await alt.json().catch(()=>({orders:[]}));
+        return normalizeOrders(jj.orders||[]);
+      }
+      throw new Error('http_'+r.status);
     }
-    return true;
+    const j = await r.json().catch(()=>({orders:[]}));
+    // /api/orders/open devuelve { ok:true, orders:[...] }
+    const list = Array.isArray(j) ? j : (j.orders || []);
+    return normalizeOrders(list);
+  }catch(e){
+    console.warn('[COCINA] fetchOpenOrders error:', e?.message || e);
+    return [];
   }
+}
 
-  // ========== IMPRESIÓN ==========
-  function printCocina(o){
-    const w=window.open('','_blank','width=400,height=600');
-    const rows=(o.items||[]).map(it=>`<div>${it.cant} × ${it.nombre}</div>`).join('');
-    const fecha=new Date(o.cierre||o.inicio).toLocaleString();
-    const nota = (o.nota && String(o.nota).trim())
-      ? `<div class="muted" style="margin:6px 0;white-space:pre-wrap;border:1px dashed #666;padding:4px">📝 ${o.nota}</div>`
-      : '';
-    w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Comanda</title>
-    <style>@page{size:80mm auto;margin:5mm}body{font:12px/1.3 -apple-system,Segoe UI,Roboto,Arial}.muted{color:#666}</style></head><body>
-    <div>Mesa: ${o.mesa??'-'} · Mozo: ${o.mozo||'-'}</div>
-    ${nota}
-    <hr>${rows}<hr><div class="muted">${fecha}</div>
-    <script>window.print(); setTimeout(()=>window.close(), 300);<\/script>
-    </body></html>`);
-    w.document.close();
-  }
-function uniqueOrders(list){
-  const byId = new Set(), byCID = new Set(), out = [];
-  for (const o of list || []) {
-    const k1 = o && (o.id != null ? String(o.id) : '');
-    const k2 = o && (o.clientId || '');
-    if (k1 && byId.has(k1)) continue;
-    if (k2 && byCID.has(k2)) continue;
-    if (k1) byId.add(k1);
-    if (k2) byCID.add(k2);
-    out.push(o);
+function normalizeOrders(arr){
+  // Evitar duplicados por id/clientId y normalizar campos
+  const seen = new Set();
+  const out = [];
+  for (const o of (arr||[])) {
+    const k = String(o && (o.id ?? o.clientId ?? ''));
+    if (!k || seen.has(k)) continue;
+    seen.add(k);
+    const total = (o.total != null)
+      ? o.total
+      : (o.items||[]).reduce((a,b)=> a + (Number(b.precio)||0)*(Number(b.cant)||0), 0);
+    out.push({
+      ...o,
+      total,
+      workflow: o.workflow || 'pendiente',
+      nota: (o.nota || '')
+    });
   }
   return out;
 }
 
-  // ========== RENDER ==========
-  async function render(){
-    const listU = uniqueOrders(list);
-const pend  = listU.filter(o=>o.workflow==='pendiente');
-const prep  = listU.filter(o=>o.workflow==='enprep');
-const listo = listU.filter(o=>o.workflow==='listo');
-
-    $('#colPend').innerHTML  = pend.map(cardHTML).join('') || '<div class="muted" style="padding:8px">Sin pedidos</div>';
-    $('#colPrep').innerHTML  = prep.map(cardHTML).join('') || '<div class="muted" style="padding:8px">Sin pedidos</div>';
-    $('#colListo').innerHTML = listo.map(cardHTML).join('') || '<div class="muted" style="padding:8px">Sin pedidos</div>';
-
-    $('#cntPend').textContent  = pend.length;
-    $('#cntPrep').textContent  = prep.length;
-    $('#cntListo').textContent = listo.length;
-
-    // Wire de acciones
-    document.querySelectorAll('.card').forEach(card=>{
-      const id = Number(card.dataset.id);
-      const data = list.find(o=>o.id===id);
-      card.querySelector('.act-print').onclick = ()=> printCocina(data);
-      card.querySelector('.act-pend').onclick  = async()=>{ if(await setWorkflow(id,'pendiente')) render(); };
-      card.querySelector('.act-prep').onclick  = async()=>{ if(await setWorkflow(id,'enprep')) render(); };
-      card.querySelector('.act-listo').onclick = async()=>{ if(await setWorkflow(id,'listo')) render(); };
-      card.querySelector('.act-entregado').onclick = async()=>{ if(await setWorkflow(id,'entregado')) render(); };
+async function setWorkflow(id, workflow){
+  try{
+    if (!(await ensureServer())) throw new Error('offline');
+    const r = await api(`/api/orders/${encodeURIComponent(id)}/status`, {
+      method: 'POST',
+      body: JSON.stringify({ patch: { workflow } })
     });
-  }
-
-  // Botón refrescar manual
-  document.getElementById('btnRefrescar').onclick = render;
-
-  // ========== BOOT + SSE ==========
-  (async function boot(){
-    // aviso visual si el server está caído
-    if (!(await ensureServer())) {
-      toast('Servidor offline · mostrando vacío');
+    if (!r.ok) {
+      const t = await r.text().catch(()=> '');
+      throw new Error(`HTTP ${r.status} ${t}`);
     }
-    await render();
+    return true;
+  }catch(e){
+    toast('No se pudo actualizar: ' + (e?.message || e));
+    return false;
+  }
+}
 
-    // SSE (solo si hay server)
-    try{
-      if (await ensureServer()) {
-        const es = new EventSource(SERVER + '/api/events');
-        es.addEventListener('orders_changed', render);
-        es.addEventListener('order_workflow', render);
-        es.addEventListener('order_closed', render);
-        es.addEventListener('hello', e=>console.log('SSE cocina ok', e.data));
-        es.onerror = ()=>console.warn('SSE desconectado…');
-      }
-    }catch(e){ console.warn('SSE no disponible', e); }
-  })();
+/* =======================
+   PRINT
+   ======================= */
+function printCocina(o){
+  const w=window.open('','_blank','width=400,height=600');
+  const rows=(o.items||[]).map(it=>`<div>${it.cant} x ${it.nombre}</div>`).join('');
+  const fecha=new Date(o.cierre||o.inicio).toLocaleString();
+  const nota = (o.nota && String(o.nota).trim())
+    ? `<div class="muted" style="margin:6px 0;white-space:pre-wrap;border:1px dashed #666;padding:4px">📝 ${o.nota}</div>`
+    : '';
+  w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Comanda</title>
+  <style>@page{size:80mm auto;margin:5mm}body{font:12px/1.3 -apple-system,Segoe UI,Roboto,Arial}.muted{color:#666}</style></head><body>
+  <div>Mesa: ${o.mesa??'-'} · Mozo: ${o.mozo||'-'}</div>${nota}
+  <hr>${rows}<hr><div class="muted">${fecha}</div>
+  <script>window.print(); setTimeout(()=>window.close(), 300);<\/script>
+  </body></html>`);
+  w.document.close();
+}
+
+/* =======================
+   RENDER
+   ======================= */
+async function render(){
+  let list = [];
+  try{
+    list = await fetchOpenOrders(); // nunca arroja excepción; si falla devuelve []
+  }catch{ list = []; }
+
+  const pend = list.filter(o=>o.workflow==='pendiente');
+  const prep = list.filter(o=>o.workflow==='enprep');
+  const listo = list.filter(o=>o.workflow==='listo');
+
+  $('#colPend').innerHTML = pend.map(cardHTML).join('');
+  $('#colPrep').innerHTML = prep.map(cardHTML).join('');
+  $('#colListo').innerHTML = listo.map(cardHTML).join('');
+  $('#cntPend').textContent = pend.length;
+  $('#cntPrep').textContent = prep.length;
+  $('#cntListo').textContent = listo.length;
+
+  // Wire de acciones (defensivo)
+  document.querySelectorAll('.card').forEach(card=>{
+    const id = Number(card.dataset.id);
+    const data = list.find(o=>Number(o.id)===id);
+    if (!data) return;
+    card.querySelector('.act-print')?.addEventListener('click', ()=> printCocina(data));
+    card.querySelector('.act-pend')?.addEventListener('click', async()=>{ if (await setWorkflow(id,'pendiente')) render(); });
+    card.querySelector('.act-prep')?.addEventListener('click', async()=>{ if (await setWorkflow(id,'enprep')) render(); });
+    card.querySelector('.act-listo')?.addEventListener('click', async()=>{ if (await setWorkflow(id,'listo')) render(); });
+    card.querySelector('.act-entregado')?.addEventListener('click', async()=>{ if (await setWorkflow(id,'entregado')) render(); });
+  });
+}
+
+function cardHTML(o){
+  const rows = (o.items||[]).map(it=>`<tr><td>${it.cant} x ${it.nombre}</td><td class="right">${money((it.precio||0)*(it.cant||0))}</td></tr>`).join('');
+  const nota = (o.nota && String(o.nota).trim())
+    ? `<div class="noteBox">📝 ${o.nota}</div>`
+    : '';
+  return `
+    <div class="card" data-id="${o.id}">
+      <div class="meta">
+        Mesa ${o.mesa ?? '-'} · ${o.mozo || '-'} · ${new Date(o.inicio).toLocaleTimeString()}
+        <span class="tag">${o.tipo||''}</span>
+        <span class="tag">Total ${money(o.total||0)}</span>
+      </div>
+      ${nota}
+      <table><tbody>${rows}</tbody></table>
+      <div class="actions">
+        <button class="btn act-print">Imprimir</button>
+        <button class="btn act-pend">Pendiente</button>
+        <button class="btn act-prep">En prep</button>
+        <button class="btn act-listo">Listo</button>
+        <button class="btn act-entregado">Entregado</button>
+      </div>
+    </div>`;
+}
+
+/* =======================
+   SSE (en vivo) + BOOT
+   ======================= */
+document.getElementById('btnRefrescar').onclick = render;
+
+(async function boot(){
+  await ensureServer();
+  await render();
+
+  // SSE con defensiva (solo si hay server)
+  try{
+    if (await ensureServer()){
+      const es = new EventSource(SERVER + '/api/events');
+      es.addEventListener('orders_changed', render);
+      es.addEventListener('order_workflow', render);
+      es.addEventListener('order_closed', render);
+      es.addEventListener('hello', e=>console.log('SSE cocina ok', e.data));
+      es.onerror = ()=>console.warn('SSE desconectado…');
+    } else {
+      console.warn('SSE omitido (server offline)');
+    }
+  }catch(e){
+    console.warn('SSE no disponible', e);
+  }
+})();
 </script>
-
-
-
 </body>
 </html>
