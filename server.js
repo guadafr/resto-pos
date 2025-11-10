@@ -26,9 +26,6 @@ const CASH_FILE     = path.join(DATA_DIR, 'cash.json');
 // ====== App + Bus ======
 const app = express();
 const bus = new EventEmitter();
-function broadcast(type, payload = {}) {
-  bus.emit('evt', { type, payload, ts: Date.now() });
-}
 
 // ====== Middlewares ======
 app.use(cors());
@@ -79,21 +76,47 @@ function normalizeBox(box) {
 app.get('/api/version', (_req, res) => res.json({ ok: true, version: SERVER_VERSION }));
 app.get('/api/ping', (_req, res) => res.json({ ok: true, ts: Date.now() }));
 
-// ====== SSE ======
-app.get('/api/events', (req, res) => {
+// ====== SSE con keep-alive (Render/NGINX friendly) ======
+const clients = new Set();
+function sseHeaders(res) {
   res.setHeader('Cache-Control', 'no-cache');
   res.setHeader('Content-Type', 'text/event-stream');
   res.setHeader('Connection', 'keep-alive');
+  res.setHeader('X-Accel-Buffering', 'no'); // evita buffering en Render
+}
+app.get('/api/events', (req, res) => {
+  sseHeaders(res);
+  res.flushHeaders?.();
   res.write('retry: 3000\n\n');
-  const send = ({ type, payload }) => {
-    res.write(`event: ${type}\n`);
-    res.write(`data: ${JSON.stringify(payload)}\n\n`);
-  };
-  send({ type: 'hello', payload: { ok: true } });
-  const listener = (evt) => send(evt);
-  bus.on('evt', listener);
-  req.on('close', () => bus.off('evt', listener));
+  res.write(`event: hello\n`);
+  res.write(`data: ${JSON.stringify({ ok: true })}\n\n`);
+  clients.add(res);
+
+  const hb = setInterval(() => {
+    try { res.write(`event: ping\ndata: {}\n\n`); }
+    catch {
+      clearInterval(hb);
+      clients.delete(res);
+      try { res.end(); } catch {}
+    }
+  }, 15000);
+
+  req.on('close', () => {
+    clearInterval(hb);
+    clients.delete(res);
+  });
 });
+function emitEvent(event, payload = {}) {
+  const data = `event: ${event}\n` + `data: ${JSON.stringify(payload)}\n\n`;
+  for (const res of clients) {
+    try { res.write(data); } catch {}
+  }
+}
+// 🔗 Mantengo compatibilidad: cada broadcast también emite por SSE
+function broadcast(type, payload = {}) {
+  bus.emit('evt', { type, payload, ts: Date.now() });
+  emitEvent(type, payload);
+}
 
 // ====== Bootstrap ======
 app.get('/api/bootstrap', async (_req, res) => {
@@ -151,14 +174,10 @@ app.delete('/api/mozos/:id', async (req, res) => {
 });
 
 // ====== Pedidos ======
-function genId() {
-  return Math.floor(Date.now() / 1000);
-}
-function genClientId() {
-  return 'c_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
-}
+function genId() { return Math.floor(Date.now() / 1000); }
+function genClientId() { return 'c_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
 
-// Crear / Actualizar pedido
+// Crear / Actualizar pedido (upsert por id o clientId)
 app.post('/api/orders', async (req, res) => {
   const o = req.body || {};
   const list = await readJSON(ORDERS_FILE, []);
@@ -173,29 +192,38 @@ app.post('/api/orders', async (req, res) => {
     const maxId = list.reduce((m, x) => Math.max(m, +x.id || 0), 0);
     o.id = o.id != null ? +o.id : (maxId + 1) || genId();
     o.estado = o.estado || 'abierto';
-    o.inicio = o.inicio || new Date().toISOString();
+    o.inicio = o.inicio || nowISO();
     list.push(o);
     await writeJSON(ORDERS_FILE, list);
-    broadcast('orders_changed', { id: o.id, action: 'insert' });
+    broadcast('orders_changed', { action: 'insert', id: o.id, order: o });
     return res.json({ ok: true, order: o, id: o.id });
   } else {
     const merged = { ...list[idx], ...o, id: (+list[idx].id || +o.id), clientId: list[idx].clientId || o.clientId };
     list.splice(idx, 1, merged);
     await writeJSON(ORDERS_FILE, list);
-    broadcast('orders_changed', { id: merged.id, action: 'update' });
+    broadcast('orders_changed', { action: 'update', id: merged.id, order: merged });
     return res.json({ ok: true, order: merged, id: merged.id });
   }
 });
 
-// Obtener pedidos
+// Obtener pedidos (con filtros)
 app.get('/api/orders', async (req, res) => {
   const { estado, tipo, date } = req.query || {};
   const list = await readJSON(ORDERS_FILE, []);
   let out = list;
   if (estado) out = out.filter(o => String(o.estado) === String(estado));
-  if (tipo) out = out.filter(o => String(o.tipo) === String(tipo));
-  if (date) out = out.filter(o => String(o.fecha || '').slice(0, 10) === String(date).slice(0, 10));
+  if (tipo)   out = out.filter(o => String(o.tipo) === String(tipo));
+  if (date)   out = out.filter(o => String(o.fecha || '').slice(0, 10) === String(date).slice(0, 10));
   res.json({ ok: true, orders: out });
+});
+
+// Obtener pedido por id (útil para Admin/Mozo)
+app.get('/api/orders/:id', async (req, res) => {
+  const id = String(req.params.id || '');
+  const list = await readJSON(ORDERS_FILE, []);
+  const o = list.find(x => String(x.id) === id);
+  if (!o) return res.status(404).json({ ok: false, error: 'not_found' });
+  res.json(o);
 });
 
 // Pedidos abiertos
@@ -204,22 +232,29 @@ app.get('/api/orders/open', async (_req, res) => {
   res.json({ ok: true, orders: list.filter(o => o.estado === 'abierto') });
 });
 
-// Cambiar estado
+// Cambiar estado / aplicar patch
 app.post('/api/orders/:id/status', async (req, res) => {
   const id = +req.params.id;
   const { estado, motivo, patch } = req.body || {};
   const list = await readJSON(ORDERS_FILE, []);
   const idx = list.findIndex(x => +x.id === id);
   if (idx < 0) return res.status(404).json({ ok: false });
+
   if (estado) list[idx].estado = estado;
   if (motivo) { list[idx].cancelReason = motivo; list[idx].cancelTs = nowISO(); }
   if (patch) Object.assign(list[idx], patch);
+
   await writeJSON(ORDERS_FILE, list);
-  broadcast('orders_changed', { id, action: 'status', estado, order: list[idx] });
+
+  broadcast('orders_changed', { action: 'status', id, estado: list[idx].estado, order: list[idx] });
+  if (patch && patch.workflow === 'listo') {
+    emitEvent('pedido_listo', { id, mesa: list[idx].mesa, mozo: list[idx].mozo });
+  }
+
   res.json({ ok: true, order: list[idx] });
 });
 
-// Cobrar pedido
+// Cobrar pedido (cierra + stock + caja + eventos)
 app.post('/api/orders/:id/charge', async (req, res) => {
   const id = +req.params.id;
   const { pagos = [], descuento = 0 } = req.body || {};
@@ -228,13 +263,14 @@ app.post('/api/orders/:id/charge', async (req, res) => {
   if (idx < 0) return res.status(404).json({ ok: false, error: 'not_found' });
 
   const order = list[idx];
-  const total = (order.items || []).reduce((a, b) => a + (b.precio || 0) * (b.cant || 0), 0);
-  const aCobrar = Math.max(0, total - Math.max(0, +descuento || 0));
+  const total    = (order.items || []).reduce((a, b) => a + (b.precio || 0) * (b.cant || 0), 0);
+  const aCobrar  = Math.max(0, total - Math.max(0, +descuento || 0));
   const sumaPago = (pagos || []).reduce((a, p) => a + (+p.monto || 0), 0);
   if (sumaPago !== aCobrar) {
     return res.status(400).json({ ok: false, error: 'sum_mismatch', total, descuento, aCobrar, sumaPagos: sumaPago });
   }
 
+  // stock
   const prods = await readJSON(PRODUCTS_FILE, []);
   let changed = false;
   for (const it of (order.items || [])) {
@@ -243,6 +279,7 @@ app.post('/api/orders/:id/charge', async (req, res) => {
   }
   if (changed) { await writeJSON(PRODUCTS_FILE, prods); broadcast('products_changed', { count: prods.length }); }
 
+  // cerrar pedido
   order.total        = total;
   order.descuento    = Math.max(0, +descuento || 0);
   order.totalCobrado = aCobrar;
@@ -252,8 +289,26 @@ app.post('/api/orders/:id/charge', async (req, res) => {
   list.splice(idx, 1, order);
   await writeJSON(ORDERS_FILE, list);
 
+  // caja (si hay abierta)
+  const cash = await readJSON(CASH_FILE, []);
+  const openIdx = cash.findIndex(b => !b.cierre);
+  if (openIdx >= 0) {
+    const box = normalizeBox(cash[openIdx]);
+    box.ventasTotal = (box.ventasTotal || 0) + aCobrar;
+    for (const p of pagos) {
+      const key = mapPagoKey(p.tipo);
+      box.ventasByPay[key] = (box.ventasByPay[key] || 0) + (+p.monto || 0);
+      box.movs.push({ ts: nowISO(), tipo: 'venta', medio: p.tipo, desc: `Mesa ${order.mesa ?? '-'} · ${order.mozo || '-'}`, monto: +p.monto || 0 });
+    }
+    cash.splice(openIdx, 1, box);
+    await writeJSON(CASH_FILE, cash);
+    broadcast('cash_updated', { action: 'mov' });
+  }
+
+  // eventos de pedido
   broadcast('order_closed', { id: order.id, order });
-  broadcast('orders_changed', { id: order.id, action: 'closed' });
+  broadcast('orders_changed', { action: 'closed', id: order.id, order });
+
   res.json({ ok: true, order, id: order.id });
 });
 
