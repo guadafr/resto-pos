@@ -1535,16 +1535,39 @@ $('#cfgGuardar').onclick=async()=>{
 
   setInterval(()=>{ if(document.querySelector('.tab.active')?.dataset.v==='mesas') loadAbiertos(); },15000);
 
-  try{
-    if (await ensureServer()){
-      const es = new EventSource(SERVER + '/api/events');
-      es.addEventListener('order_updated', ()=> { loadAbiertos(); });
-      es.addEventListener('order_closed',  ()=> { loadAbiertos(); loadPagados(); renderCaja(); });
-      es.addEventListener('order_cancelled',()=> { loadAbiertos(); loadPagados(); renderCaja(); });
-      es.addEventListener('cash_updated', ()=> { renderCaja(); renderHistorial(); });
-      es.onerror = ()=>{};
-    }
-  }catch(e){}
+// 🔄 Auto-refresh en vivo (SSE) — ADMIN
+(() => {
+  const es = new EventSource(location.origin + '/api/events');
+
+  es.addEventListener('hello', e => console.log('SSE admin ok', e.data));
+
+  // Cualquier cambio de pedidos => refrescá todo lo relevante
+  es.addEventListener('orders_changed', () => {
+    loadAbiertos();
+    loadPagados();
+    renderCaja();
+  });
+
+  // Cuando un pedido se cierra explícitamente
+  es.addEventListener('order_closed', () => {
+    loadAbiertos();
+    loadPagados();
+    renderCaja();
+  });
+
+  // Cambios de caja (movimientos / apertura / cierre)
+  es.addEventListener('cash_updated', () => {
+    renderCaja();
+    renderHistorial();
+  });
+
+  // Cambios de catálogo y mozos
+  es.addEventListener('products_changed', () => { fillProd(); });
+  es.addEventListener('mozos_changed', () => { fillMozos(); });
+
+  es.onerror = (err) => console.warn('SSE admin desconectado, reintentará...', err);
+})();
+
 })();
 
 // === 🔄 Canal SSE: actualiza en tiempo real ===

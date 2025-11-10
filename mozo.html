@@ -833,24 +833,36 @@ document.getElementById('btnVentaRapida').onclick=()=>{ currentView='LLEVAR'; op
   await renderGrid();
 
   // SSE
-  try{
-    if (await ensureServer()){
-      const es = new EventSource(SERVER + '/api/events');
-      es.addEventListener('pedido_listo', (e)=>{
-        try{
-          const payload = JSON.parse(e.data||'{}');
-          const d=document.createElement('div');
-          d.textContent=`✅ Pedido listo · Mesa ${payload.mesa ?? '-'} · ${payload.mozo || '-'}`;
-          d.style.cssText='position:fixed;right:12px;bottom:12px;background:#1e293b;color:#e8eef7;padding:10px 12px;border:1px solid #2b3b59;border-radius:10px;z-index:99999';
-          document.body.appendChild(d); setTimeout(()=>d.remove(), 3500);
-          try{ new Audio('beep.mp3').play().catch(()=>{});}catch{}
-        }catch{}
-      });
-      es.addEventListener('orders_changed', ()=> renderGrid());
-      es.addEventListener('products_changed', ()=> {});
-      es.addEventListener('mozos_changed', ()=> {});
-    }
-  }catch(e){}
+// 🔄 Auto-refresh en vivo (SSE) — MOZO
+(() => {
+  const es = new EventSource(location.origin + '/api/events');
+
+  es.addEventListener('hello', e => console.log('SSE mozo ok', e.data));
+
+  // Cualquier cambio de pedidos => refrescar grilla
+  es.addEventListener('orders_changed', () => { renderGrid(); });
+  es.addEventListener('order_closed',    () => { renderGrid(); });
+
+  // Cambios de catálogo / mozos
+  es.addEventListener('products_changed', () => { /* si querés: recargar menú */ renderGrid(); });
+  es.addEventListener('mozos_changed',    () => { /* si querés: recargar mozos */ renderGrid(); });
+
+  // Si el server llegara a emitir "pedido_listo"
+  es.addEventListener('pedido_listo', (e) => {
+    try{
+      const payload = JSON.parse(e.data||'{}');
+      const d=document.createElement('div');
+      d.textContent=`✅ Pedido listo · Mesa ${payload.mesa ?? '-'} · ${payload.mozo || '-'}`;
+      d.style.cssText='position:fixed;right:12px;bottom:12px;background:#1e293b;color:#e8eef7;padding:10px 12px;border:1px solid #2b3b59;border-radius:10px;z-index:99999';
+      document.body.appendChild(d); setTimeout(()=>d.remove(), 3500);
+      try{ new Audio('beep.mp3').play().catch(()=>{});}catch{}
+    }catch{}
+    renderGrid();
+  });
+
+  es.onerror = (err) => console.warn('SSE mozo desconectado, reintentará...', err);
+})();
+
 })();
 
 
