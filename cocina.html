@@ -281,6 +281,9 @@ async function render(){
   $('#cntPrep').textContent = prep.length;
   $('#cntListo').textContent = listo.length;
 
+
+    notifyNewOrders(list); // 👈 AGREGAR ESTA LÍNEA
+
   // Wire de acciones (defensivo)
   document.querySelectorAll('.card').forEach(card=>{
     const id = Number(card.dataset.id);
@@ -331,7 +334,7 @@ document.getElementById('btnRefrescar').onclick = render;
   try{
     if (await ensureServer()){
       const es = new EventSource(SERVER + '/api/events');
-      es.addEventListener('orders_changed', render);
+es.addEventListener('orders_changed', handleOrdersChanged);
       es.addEventListener('order_workflow', render);
       es.addEventListener('order_closed', render);
       es.addEventListener('hello', e=>console.log('SSE cocina ok', e.data));
@@ -343,6 +346,104 @@ document.getElementById('btnRefrescar').onclick = render;
     console.warn('SSE no disponible', e);
   }
 })();
+
+
+
+// ====== Notificaciones nuevas de pedidos (sonido + blink + Notification API) ======
+let KNOWN_ORDER_IDS = new Set();
+const TITLE_BASE = document.title || 'Cocina';
+
+function ring() {
+  const a = document.getElementById('ding');
+  if (!a) return;
+  try {
+    a.currentTime = 0;
+    a.play().catch(() => showSoundGate());
+  } catch {
+    showSoundGate();
+  }
+}
+function showSoundGate() {
+  if (document.getElementById('soundGate')) return;
+  const g = document.createElement('div');
+  g.id = 'soundGate';
+  g.textContent = '🔔 Habilitar sonido de pedidos';
+  g.style.cssText = 'position:fixed;right:12px;bottom:12px;background:#111a;color:#fff;padding:10px 12px;border:1px solid #333;border-radius:10px;cursor:pointer;z-index:99999';
+  g.onclick = () => {
+    const a = document.getElementById('ding');
+    a?.play().then(() => g.remove()).catch(()=>{});
+  };
+  document.body.appendChild(g);
+}
+function flashTitle(times = 10, ms = 800) {
+  let i = 0;
+  const iv = setInterval(() => {
+    document.title = (i++ % 2) ? '🔔 NUEVO PEDIDO' : '🍽️ Cocina';
+    if (i > times) { clearInterval(iv); document.title = TITLE_BASE; }
+  }, ms);
+}
+function sysNotify(text) {
+  if (!('Notification' in window)) return;
+  if (Notification.permission === 'granted') {
+    try { new Notification('Nuevo pedido', { body: text }); } catch {}
+  } else if (Notification.permission !== 'denied') {
+    Notification.requestPermission().then(p => {
+      if (p === 'granted') { try { new Notification('Nuevo pedido', { body: text }); } catch {} }
+    });
+  }
+}
+
+/**
+ * Llamá a esto pasando la lista de pedidos abiertos (como ya la traés en render()).
+ * Hace sonar/avisar sólo por los que no estaban en KNOWN_ORDER_IDS.
+ */
+function notifyNewOrders(openOrders = []) {
+  const fresh = (openOrders || []).filter(o => o && o.estado === 'abierto' && !KNOWN_ORDER_IDS.has(String(o.id)));
+  if (!fresh.length) return;
+
+  // marcar conocidos
+  fresh.forEach(o => KNOWN_ORDER_IDS.add(String(o.id)));
+
+  // notificar
+  ring();
+  flashTitle();
+
+  // notificación del sistema (opcional)
+  const first = fresh[0];
+  sysNotify(`Mesa ${first.mesa ?? '-'} · ${first.mozo || '-'} · ${first.items?.length || 0} ítems`);
+}
+
+// === Hook: integrá en tu render() justo después de armar la lista ===
+// Dentro de tu render() existente, luego de obtener `list`:
+/// notifyNewOrders(list);
+
+// === Hook: integrá en el SSE para reaccionar instantáneo a inserts ===
+// Donde tenés:
+//   es.addEventListener('orders_changed', render);
+// reemplazalo por:
+function handleOrdersChanged(e) {
+  try {
+    const payload = JSON.parse(e.data || '{}');
+    // Si el server manda {action:'insert'} para nuevos pedidos, soná de una
+    if (payload?.action === 'insert' && payload?.id != null) {
+      if (!KNOWN_ORDER_IDS.has(String(payload.id))) {
+        KNOWN_ORDER_IDS.add(String(payload.id));
+        ring();
+        flashTitle();
+        sysNotify(`Pedido #${payload.id} recibido`);
+      }
+    }
+  } catch {}
+  render(); // de todas formas refrescamos columnas
+}
+
 </script>
+
+
+<!-- Sonido para nuevos pedidos -->
+<audio id="ding" preload="auto">
+  <source src="beep.mp3" type="audio/mpeg">
+</audio>
+
 </body>
 </html>
