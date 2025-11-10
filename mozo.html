@@ -330,6 +330,77 @@ function genCID() {
   return 'c_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
 }
 
+// ---- Caja (server) ----
+async function serverGetOpenCash(){
+  try{
+    const r = await api('/api/cash/open', { timeoutMs: 5000 });
+    if (r.status === 404) return null;
+    if (!r.ok) throw new Error('cash_open_error');
+    return await r.json();
+  }catch{ return null; }
+}
+async function serverOpenCash(apertura=0, cajero='Mozo', turno='Auto'){
+  const r = await api('/api/cash/open', {
+    method:'POST',
+    body: JSON.stringify({ apertura, cajero, turno })
+  });
+  if (!r.ok) throw new Error('open_cash_failed');
+  return await r.json();
+}
+
+// ---- Shadow box local (solo si NO hay server) ----
+function mapPagoKey(tipo=''){
+  const t = String(tipo).toLowerCase();
+  if (t.includes('efectivo')) return 'efectivo';
+  if (t.includes('tarjeta')) return 'tarjeta';
+  if (t.includes('transfer')) return 'transferencia';
+  if (t.includes('qr')||t.includes('mp')||t.includes('mercado')||t.includes('pedido')) return 'qr';
+  return 'otros';
+}
+function normalizeBox(box){
+  if (!box) return null;
+  box.ventasByPay   = Object.assign({efectivo:0,tarjeta:0,transferencia:0,qr:0,otros:0}, box.ventasByPay||{});
+  box.ingresosByPay = Object.assign({efectivo:0,tarjeta:0,transferencia:0,qr:0,otros:0}, box.ingresosByPay||{});
+  box.egresosByPay  = Object.assign({efectivo:0,tarjeta:0,transferencia:0,qr:0,otros:0}, box.egresosByPay||{});
+  box.movs = box.movs || [];
+  box.ventasTotal   = box.ventasTotal || 0;
+  box.ingresosTotal = box.ingresosTotal || 0;
+  box.egresosTotal  = box.egresosTotal || 0;
+  box.apertura      = box.apertura || 0;
+  return box;
+}
+async function getLocalShadowOpenBox(){
+  const boxes = await getAll('cash');
+  return boxes.find(b => !b.cierre && b._shadow === true) || null;
+}
+async function saveLocalShadowBox(box){
+  box._shadow = true;
+  await put('cash', box);
+}
+async function addVentaToLocalCash(pagos, total, meta={ fuente:'mozo', pedidoId:null }){
+  let box = await getLocalShadowOpenBox();
+  if (!box){
+    box = normalizeBox({
+      _shadow: true,
+      apertura: 0,
+      aperturaTs: nowISO(),
+      movs: [],
+      ventasByPay:{efectivo:0,tarjeta:0,transferencia:0,qr:0,otros:0},
+      ingresosByPay:{efectivo:0,tarjeta:0,transferencia:0,qr:0,otros:0},
+      egresosByPay:{efectivo:0,tarjeta:0,transferencia:0,qr:0,otros:0},
+      ventasTotal:0, ingresosTotal:0, egresosTotal:0
+    });
+  } else box = normalizeBox(box);
+
+  box.ventasTotal = (box.ventasTotal||0) + (total||0);
+  (pagos||[]).forEach(p=>{
+    const key = mapPagoKey(p.tipo);
+    box.ventasByPay[key] = (box.ventasByPay[key]||0) + (+p.monto||0);
+    box.movs.push({ ts: nowISO(), tipo:'venta', medio:p.tipo, desc: meta.pedidoId?`Pedido #${meta.pedidoId}`:'', monto:+p.monto||0, fuente: meta.fuente||'mozo', pedidoId: meta.pedidoId||null });
+  });
+
+  await saveLocalShadowBox(box);
+}
 
 
 // ======== UI: Grid de mesas ========
@@ -544,44 +615,65 @@ document.getElementById('btnCobrar').onclick = ()=>{
 document.getElementById('cobroCerrar').onclick = () => document.getElementById('dlgCobro').close();
 
 document.getElementById('pagoOk').onclick = async ()=>{
+  if (!currentOrder || currentOrder.items.length===0) return alert('Pedido vacío');
+
   const desc  = Math.max(0, parseInt(document.getElementById('pagoDesc').value || '0'));
   const total = currentOrder.items.reduce((a,b)=> a + b.precio*b.cant, 0);
   const aCobrar = Math.max(0, total - desc);
   const pagos = leerPagosDesdeTabla();
   const sumaPagos = pagos.reduce((a,p)=> a + p.monto, 0);
-  if (sumaPagos !== aCobrar) return alert(`La suma de pagos (${money(sumaPagos)}) debe igualar el total a cobrar (${money(aCobrar)}).`);
+  if (sumaPagos !== aCobrar) {
+    return alert(`La suma de pagos (${money(sumaPagos)}) debe igualar el total a cobrar (${money(aCobrar)}).`);
+  }
 
-  // 1) guardar items + nota vigente
+  // 1) Guardar items + nota vigente
   currentOrder.nota = ($('#pedidoObs')?.value||'').trim();
   currentOrder = await saveOrder(currentOrder);
 
-  // 2) cerrar en backend (actualiza stock + caja) — enviamos también 'nota'
+  // 2) Cobro
   try{
     if (await ensureServer()){
+      // 2.a) asegurar caja abierta en server
+      let open = await serverGetOpenCash();
+      if (!open){
+        const ok = confirm('No hay caja abierta en el servidor. ¿Abrir caja con $0 ahora?');
+        if (!ok) return; // sin caja no impacta ventas en /cash
+        await serverOpenCash(0, 'Mozo', 'Auto');
+      }
+
+      // 2.b) cerrar pedido en server (impacta caja del server)
       await chargeOrder(currentOrder.id, pagos, desc, currentOrder.nota);
+      // ✅ NO registrar shadow local aquí (evitamos doble conteo).
     } else {
-      // Fallback local
+      // 2.c) OFFLINE: impactar stock + cerrar local + shadow box local (para ver en Admin)
       const prods = await getAll('products');
       currentOrder.items.forEach(it=>{
         const p = prods.find(x=>String(x.id)===String(it.id));
         if (p && p.trackStock) { p.stock = Math.max(0,(p.stock||0)-it.cant); put('products', p); }
       });
-      Object.assign(currentOrder, {pagos, descuento:desc, total, totalCobrado:aCobrar, cierre: nowISO(), estado:'cerrado'});
+      Object.assign(currentOrder, { pagos, descuento: desc, total, totalCobrado: aCobrar, cierre: nowISO(), estado:'cerrado' });
       await saveOrder(currentOrder);
+
+      // 👉 sumar a caja local (shadow) para que Admin/Caja lo vea hasta que vuelva el server
+      await addVentaToLocalCash(pagos, aCobrar, { fuente:'mozo', pedidoId: currentOrder.id });
     }
   }catch(e){
-    alert('No se pudo cerrar en servidor. Probá de nuevo.');
-    return;
+    console.warn(e);
+    return alert('No se pudo cerrar el pedido. Verificá conexión o reintentá.');
   }
 
-  // 3) ticket + cocina (según config)
+  // 3) Tickets
   if (CONFIG?.autoPrintKitchenOnCharge) printCocina(currentOrder);
-  printClienteAR(Object.assign({}, currentOrder, { pagos, descuento:desc, total, totalCobrado:aCobrar, cierre: nowISO() }));
+  printClienteAR(Object.assign({}, currentOrder, { pagos, descuento: desc, total, totalCobrado: aCobrar, cierre: nowISO() }));
 
+  // 4) Cerrar diálogos y refrescar
   document.getElementById('dlgCobro').close();
   document.getElementById('dlgPedido').close();
   renderGrid();
+  toast('✅ Cobro registrado');
 };
+
+
 
 document.getElementById('btnCancelar').onclick = async () => {
   if (!currentOrder) return;
