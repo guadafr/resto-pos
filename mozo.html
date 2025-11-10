@@ -852,6 +852,42 @@ document.getElementById('btnVentaRapida').onclick=()=>{ currentView='LLEVAR'; op
     }
   }catch(e){}
 })();
+
+
+// === 🔄 Canal SSE: actualiza en tiempo real ===
+(async function startSSE() {
+  try {
+    const SERVER = location.origin; // Render usa el mismo dominio (no pongas localhost)
+    const es = new EventSource(SERVER + '/api/events');
+
+    es.addEventListener('hello', e => console.log('🔌 Conectado SSE:', e.data));
+
+    // 👇 Cuando hay cambio en pedidos, actualizo pantalla
+    es.addEventListener('orders_changed', async e => {
+      console.log('📦 Pedido cambiado', e.data);
+      if (typeof render === 'function') await render();
+    });
+
+    // 👇 Cuando se marca un pedido listo (útil en cocina/mozo)
+    es.addEventListener('pedido_listo', async e => {
+      console.log('✅ Pedido listo', e.data);
+      if (typeof render === 'function') await render();
+    });
+
+    // 👇 Cuando cambian mozos o productos (opcional)
+    es.addEventListener('mozos_changed', async e => {
+      if (typeof render === 'function') await render();
+    });
+    es.addEventListener('products_changed', async e => {
+      if (typeof render === 'function') await render();
+    });
+
+    es.onerror = err => console.warn('⚠️ SSE desconectado, reintentando...', err);
+  } catch (err) {
+    console.error('❌ Error SSE:', err);
+  }
+})();
+
 </script>
 
 
