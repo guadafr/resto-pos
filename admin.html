@@ -295,34 +295,29 @@
 </main>
 
 <script>
+/* ============================================================
+   RestoPOS — ADMIN (compatible con server /api/orders/open y /api/orders/by-date)
+   ============================================================ */
 
-// ====== RestoPOS: bootstrap de red seguro (usar en MOZO / ADMIN / COCINA) ======
+/* ====== Bootstrap de red seguro (compartido) ====== */
 (() => {
-  // 1) Servidor destino
-  // - En Render: forzamos mismo origen (https) para evitar Mixed Content.
-  // - En local (http://localhost): permitimos host/puerto guardados.
   const savedHost = localStorage.getItem('restopos_server_host');
   const savedPort = localStorage.getItem('restopos_server_port');
-
   const IS_LOCAL = ['localhost','127.0.0.1','::1'].includes(location.hostname);
-  let SERVER = location.origin; // default seguro (Render)
 
+  let SERVER = location.origin; // seguro para Render/producción
   if (IS_LOCAL && location.protocol !== 'https:') {
     const host = savedHost || 'localhost';
     const port = Number(savedPort) || 3002;
     SERVER = `${location.protocol}//${host}:${port}`;
   }
-
-  // Exponer para el resto del código
   window.RESTO_SERVER = SERVER;
-  console.log('[RestoPOS] SERVER =', SERVER);
+  console.log('[RestoPOS ADMIN] SERVER =', SERVER);
 
-  // 2) fetch helper con timeout y headers por defecto
   const DEFAULT_HEADERS = { 'Content-Type': 'application/json' };
-
   function api(path, opt = {}) {
     const controller = new AbortController();
-    const t = setTimeout(() => controller.abort(), opt.timeoutMs ?? 8000); // 8s
+    const t = setTimeout(() => controller.abort(), opt.timeoutMs ?? 8000);
     const url = `${SERVER}${path}`;
     const fetchOpts = {
       method: opt.method || 'GET',
@@ -335,29 +330,20 @@
     };
     return fetch(url, fetchOpts).finally(() => clearTimeout(t));
   }
-
   window.api = api;
 
-  // 3) healthcheck con memo (evita spamear ping)
   let SERVER_OK = false;
   let _lastPing = 0;
-
   async function ensureServer() {
     const now = Date.now();
     if (now - _lastPing < 5000) return SERVER_OK;
     _lastPing = now;
-    try {
-      const r = await api('/api/ping', { timeoutMs: 4000 });
-      SERVER_OK = r.ok;
-    } catch {
-      SERVER_OK = false;
-    }
+    try { const r = await api('/api/ping', { timeoutMs: 4000 }); SERVER_OK = r.ok; }
+    catch { SERVER_OK = false; }
     return SERVER_OK;
   }
-
   window.ensureServer = ensureServer;
 
-  // 4) utilidades rápidas
   window.toast = (msg) => {
     try {
       const d = document.createElement('div');
@@ -368,40 +354,29 @@
     } catch {}
   };
 
-  // 5) “botón de pánico”: /?reset=1 → limpia SW + host/port y recarga
+  // Botón de pánico: /?reset=1
   (async () => {
     const u = new URL(location.href);
     if (u.searchParams.get('reset') === '1') {
       try {
-        // limpiar overrides
         localStorage.removeItem('restopos_server_host');
         localStorage.removeItem('restopos_server_port');
-
-        // desregistrar todos los SW
         if ('serviceWorker' in navigator) {
           const regs = await navigator.serviceWorker.getRegistrations();
           await Promise.all(regs.map(r => r.unregister().catch(()=>{})));
         }
-        // limpiar caches
         if (window.caches) {
           const names = await caches.keys();
           await Promise.all(names.map(n => caches.delete(n)));
         }
-        // recargar limpio (sin el reset)
         u.searchParams.delete('reset');
         location.replace(u.toString());
-        return;
-      } catch (e) {
-        console.warn('reset error', e);
-      }
+      } catch (e) { console.warn('reset error', e); }
     }
   })();
-
 })();
 
-
-
-// === CONFIG merge ===
+/* ====== CONFIG merge ====== */
 let CONFIG = { restaurantName:'Mi Restaurante', adminPin:'1234', tables:20, autoPrintKitchenOnSave:false, autoPrintKitchenOnCharge:true };
 async function loadConfigMerged(){
   try{
@@ -414,7 +389,7 @@ async function loadConfigMerged(){
   }catch{}
 }
 
-// === IndexedDB helpers ===
+/* ====== IndexedDB helpers ====== */
 const DB_NAME='restoDBv23', DB_VER=1; let db;
 function openDB(){ return new Promise((res,rej)=>{ const req=indexedDB.open(DB_NAME,DB_VER);
   req.onupgradeneeded=e=>{ const db=e.target.result;
@@ -428,10 +403,12 @@ function put(s,v){return new Promise((res,rej)=>{const r=tx(s,'readwrite').put(v
 function getAll(s){return new Promise((res,rej)=>{const r=tx(s).getAll(); r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error)})}
 function get(s,id){return new Promise((res,rej)=>{const r=tx(s).get(id); r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error)})}
 function del(s,id){return new Promise((res,rej)=>{const r=tx(s,'readwrite').delete(id); r.onsuccess=()=>res(); r.onerror=()=>rej(r.error)})}
+
 const $=s=>document.querySelector(s), $$=s=>Array.from(document.querySelectorAll(s));
 function money(n){return '$ '+(n/100).toFixed(2)}
 function nowISO(){ return new Date().toISOString(); }
 function dstr(d){ return d.toISOString().slice(0,10); }
+
 function mapPagoKey(tipo){
   const t=(tipo||'').toLowerCase();
   if(t.includes('efectivo'))return 'efectivo';
@@ -454,16 +431,7 @@ function normalizeBox(box){
   return box;
 }
 
-// Notificaciones / Toast
-const BC = new BroadcastChannel('restopos');
-function toast(msg){
-  const d=document.createElement('div');
-  d.textContent=msg;
-  d.style.cssText='position:fixed;right:12px;bottom:12px;background:#1e293b;color:#e8eef7;padding:10px 12px;border:1px solid #2b3b59;border-radius:10px;z-index:99999';
-  document.body.appendChild(d); setTimeout(()=>d.remove(), 3500);
-}
-
-// --- SHADOW BOX (caja local para sumar ventas cuando el server no actualiza caja) ---
+/* ====== Shadow box local (por si server no refleja) ====== */
 async function getLocalShadowOpenBox(){
   const boxes = await getAll('cash');
   return boxes.find(b => !b.cierre && b._shadow === true) || null;
@@ -490,64 +458,60 @@ function mergeBoxes(serverBox, localShadow){
   s.movs = [...(s.movs || []), ...(l.movs || [])];
   return s;
 }
- 
 async function addVentaToLocalCash(pagos, total, meta = { fuente: 'admin', pedidoId: null }) {
   let box = await getLocalShadowOpenBox();
   if (!box) {
     box = {
-      _shadow: true,
-      apertura: 0,
-      aperturaTs: nowISO(),
-      movs: [],
+      _shadow: true, apertura: 0, aperturaTs: nowISO(), movs: [],
       ventasByPay: { efectivo: 0, tarjeta: 0, transferencia: 0, qr: 0, otros: 0 },
       ingresosByPay: { efectivo: 0, tarjeta: 0, transferencia: 0, qr: 0, otros: 0 },
       egresosByPay: { efectivo: 0, tarjeta: 0, transferencia: 0, qr: 0, otros: 0 },
       ventasTotal: 0, ingresosTotal: 0, egresosTotal: 0
     };
-  } else {
-    box = normalizeBox(box);
-  }
+  } else box = normalizeBox(box);
+
   box.ventasTotal = (box.ventasTotal || 0) + (total || 0);
   pagos.forEach(p => {
     const key = mapPagoKey(p.tipo);
     box.ventasByPay[key] = (box.ventasByPay[key] || 0) + (p.monto || 0);
     box.movs.push({
-      ts: nowISO(),
-      tipo: 'venta',
-      medio: p.tipo,
+      ts: nowISO(), tipo: 'venta', medio: p.tipo,
       desc: p.obs || (meta.pedidoId ? `Pedido #${meta.pedidoId}` : ''),
-      monto: p.monto || 0,
-      fuente: meta.fuente || 'admin',
-      pedidoId: meta.pedidoId || null
+      monto: p.monto || 0, fuente: meta.fuente || 'admin', pedidoId: meta.pedidoId || null
     });
   });
   await saveLocalShadowBox(box);
 }
 
-// === Datos (server + fallback) ===
+/* ====== DATOS (ajustado a tus endpoints) ====== */
+// Abiertos → GET /api/orders/open
 async function fetchOpenOrders(){
   if (await ensureServer()){
-    const r = await api('/api/orders?estado=abierto');
+    const r = await api('/api/orders/open');
     if (r.ok){
       const j = await r.json();
-      return j.orders || [];
+      return Array.isArray(j) ? j : (j.orders || []);
     }
   }
   const all=await getAll('orders');
   return all.filter(o=>o.estado==='abierto').sort((a,b)=> new Date(a.inicio)-new Date(b.inicio));
 }
+
+// Cerrados por fecha → GET /api/orders/by-date?date=YYYY-MM-DD
 async function fetchPaidOrders(fechaISO){
   if (await ensureServer()){
-    const r = await api('/api/orders?estado=cerrado&date='+encodeURIComponent(fechaISO));
+    const r = await api('/api/orders/by-date?date=' + encodeURIComponent(fechaISO));
     if (r.ok){
       const j = await r.json();
-      return j.orders || [];
+      return Array.isArray(j) ? j : (j.orders || []);
     }
   }
   const all=await getAll('orders');
   return all.filter(o => o.estado==='cerrado' && o.fecha===fechaISO)
             .sort((a,b)=> new Date(a.cierre) - new Date(b.cierre));
 }
+
+// Cambiar estado (anulación)
 async function cancelOrder(id){
   if (await ensureServer()){
     const r = await api(`/api/orders/${id}/status`, {method:'POST', body: JSON.stringify({estado:'anulado', motivo:'Anulado desde Admin'})});
@@ -561,7 +525,7 @@ async function cancelOrder(id){
   return true;
 }
 
-// === Productos ===
+// Productos / Mozos sin cambios (coinciden con server)
 async function fetchProducts(){
   if (await ensureServer()){
     const r = await api('/api/products');
@@ -587,8 +551,6 @@ async function deleteProduct(id){
   await del('products', id);
   return true;
 }
-
-// === Mozos ===
 async function fetchMozos(){
   if (await ensureServer()){
     const r = await api('/api/mozos');
@@ -618,7 +580,7 @@ async function deleteMozo(id){
   return true;
 }
 
-// --- Helpers de caja ---
+/* ====== Caja (server + fallback) ====== */
 function calcEfEsperado(box){
   return Math.max(0,
     (box.apertura || 0) +
@@ -635,13 +597,11 @@ function calcTotalCaja(box){
     (box.egresosTotal || 0)
   );
 }
-
-// === Caja (Server + fallback) ===
 async function serverGetOpenCash(){
   const r = await api('/api/cash/open');
   if (r.status === 404) return null;
   if (!r.ok) throw new Error('HTTP '+r.status+' '+await r.text());
-  return await r.json(); // box
+  return await r.json();
 }
 async function serverOpenCash(apertura,cajero,turno){
   const r = await api('/api/cash/open', {method:'POST', body: JSON.stringify({apertura,cajero,turno})});
@@ -677,21 +637,8 @@ async function getOpenCashBox(){
   const boxes = await getAll('cash');
   return boxes.find(b => !b.cierre) || null;
 }
-function uniqueOrders(list){
-  const byId = new Set(), byCID = new Set(), out = [];
-  for (const o of list || []) {
-    const k1 = o && (o.id != null ? String(o.id) : '');
-    const k2 = o && (o.clientId || '');
-    if (k1 && byId.has(k1)) continue;
-    if (k2 && byCID.has(k2)) continue;
-    if (k1) byId.add(k1);
-    if (k2) byCID.add(k2);
-    out.push(o);
-  }
-  return out;
-}
 
-// =================== UI: Tabs ===================
+/* ====== UI ====== */
 document.querySelector('.tabs').onclick=e=>{
   const b=e.target.closest('.tab'); if(!b)return;
   document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
@@ -704,8 +651,20 @@ document.querySelector('.tabs').onclick=e=>{
 };
 document.getElementById('btnSalir').onclick=()=>{ location.href='index.html?v=235'; };
 
-// =================== Mesas / Abiertos ===================
 let ultimoPedidoVisto=null;
+
+/* ---- Abiertos (grid) ---- */
+function uniqueById(list){
+  const seen = new Set();
+  const out = [];
+  for (const x of list || []) {
+    const id = String(x && (x.id ?? x._id ?? ''));
+    if (!id || seen.has(id)) continue;
+    seen.add(id);
+    out.push(x);
+  }
+  return out;
+}
 
 async function loadAbiertos(){
   const tb=$("#tblAbiertos tbody"); tb.innerHTML='';
@@ -715,11 +674,11 @@ async function loadAbiertos(){
     const tr=document.createElement('tr');
     tr.innerHTML=`
       <td>${o.mesa??'-'}</td>
-      <td>${o.tipo}</td>
+      <td>${o.tipo||''}</td>
       <td>${o.mozo||'-'}</td>
       <td>${new Date(o.inicio).toLocaleTimeString()}</td>
       <td>${o.items?.length||0}</td>
-      <td class="right">${money(o.total||0)}</td>
+      <td class="right">${money(o.total||((o.items||[]).reduce((a,b)=>a+(b.precio||0)*(b.cant||0),0)))}</td>
       <td>
         <button class="btn" data-view="${o.id}">Ver</button>
         <button class="btn" data-cobrar="${o.id}">Cobrar</button>
@@ -735,7 +694,7 @@ async function loadAbiertos(){
   });
 }
 
-// Cobrados del día
+/* ---- Pagados del día ---- */
 async function loadPagados(){
   const tb = document.querySelector('#tblPagados tbody'); if (!tb) return;
   tb.innerHTML = '';
@@ -750,9 +709,9 @@ async function loadPagados(){
                    : (o.pago?.tipo || '-') + (o.pago?.obs ? (' · '+o.pago.obs) : '');
     const tr = document.createElement('tr');
     tr.innerHTML = `
-      <td>${new Date(o.cierre).toLocaleTimeString()}</td>
+      <td>${o.cierre?new Date(o.cierre).toLocaleTimeString():'-'}</td>
       <td>${o.mesa ?? '-'}</td>
-      <td>${o.tipo}</td>
+      <td>${o.tipo||''}</td>
       <td>${o.mozo || '-'}</td>
       <td>${pagoTxt}</td>
       <td class="right">${o.descuento ? ('- ' + money(o.descuento)) : '$ 0.00'}</td>
@@ -772,9 +731,9 @@ document.getElementById('paidCSV')?.addEventListener('click', async ()=>{
     const pagoTxt = o.pagos?.length ? o.pagos.map(p=>p.tipo).join(' + ')
                    : (o.pago?.tipo || '-') + (o.pago?.obs ? (' · '+o.pago.obs) : '');
     rows.push([
-      new Date(o.cierre).toLocaleTimeString(),
+      o.cierre?new Date(o.cierre).toLocaleTimeString():'-',
       o.mesa ?? '-',
-      o.tipo,
+      o.tipo||'',
       o.mozo || '-',
       pagoTxt,
       (o.descuento || 0)/100,
@@ -787,31 +746,48 @@ document.getElementById('paidCSV')?.addEventListener('click', async ()=>{
   setTimeout(()=>URL.revokeObjectURL(url), 1000);
 });
 
-// Modal detalle
+/* ---- Modal detalle (sin GET /api/orders/:id) ---- */
 async function verDetalle(id){
   let o = null;
+
+  // 1) abiertos
   try{
     if (await ensureServer()){
-      let r = await api('/api/orders');
+      const r = await api('/api/orders/open');
       if (r.ok){
         const j = await r.json();
-        const list = j.orders || [];
+        const list = Array.isArray(j)? j : (j.orders||[]);
         o = list.find(x => +x.id === +id) || null;
       }
     }
   }catch{}
+
+  // 2) cerrados del día seleccionado en UI (o hoy)
+  if (!o){
+    try{
+      const val = document.getElementById('paidFecha')?.value || dstr(new Date());
+      const r = await api('/api/orders/by-date?date=' + encodeURIComponent(val));
+      if (r.ok){
+        const j = await r.json();
+        const list = Array.isArray(j)? j : (j.orders||[]);
+        o = list.find(x => +x.id === +id) || null;
+      }
+    }catch{}
+  }
+
+  // 3) fallback local
   if (!o){
     try{ o = await get('orders', id); }catch{}
   }
   if (!o){ alert('No se encontró el pedido.'); return; }
 
   ultimoPedidoVisto = o;
-  document.getElementById('detTitulo').textContent = `Mesa ${o.mesa??'-'} · ${o.tipo}`;
+  document.getElementById('detTitulo').textContent = `Mesa ${o.mesa??'-'} · ${o.tipo||''}`;
   document.getElementById('detMeta').textContent   = `Mozo: ${o.mozo||'-'} · Inicio: ${new Date(o.inicio).toLocaleString()}`;
 
   const notaHtml = (o.nota && o.nota.trim())
-  ? `<div class="muted" style="margin:6px 0;white-space:pre-wrap;border:1px dashed #666;padding:4px">📝 ${o.nota}</div>`
-  : '';
+    ? `<div class="muted" style="margin:6px 0;white-space:pre-wrap;border:1px dashed #666;padding:4px">📝 ${o.nota}</div>`
+    : '';
   document.getElementById('detMeta').insertAdjacentHTML('afterend', notaHtml);
 
   const tb = document.querySelector('#detItems tbody'); tb.innerHTML='';
@@ -820,12 +796,14 @@ async function verDetalle(id){
     tr.innerHTML=`<td>${it.nombre}</td><td>${it.cant}</td><td class="right">${money(it.precio)}</td><td class="right">${money(it.precio*it.cant)}</td>`;
     tb.appendChild(tr);
   });
-  document.getElementById('detTotal').textContent = money(o.total||0);
+  const totalCalc = (o.items||[]).reduce((a,b)=>a+(b.precio||0)*(b.cant||0),0);
+  document.getElementById('detTotal').textContent = money(o.total||totalCalc||0);
   document.getElementById('dlgDetalle').showModal();
 }
 
 function moneyFmt(n){ return '$ ' + (n/100).toFixed(2); }
 
+/* ---- Pago desde admin (sin cambios de server) ---- */
 function adminNuevaFilaPagoRow(pago={tipo:'Efectivo', obs:'', monto:0}){
   const tr = document.createElement('tr');
   tr.innerHTML = `
@@ -869,7 +847,6 @@ function adminRenderTablaPagos(pedido, pagos){
   adminActualizarResumenPagos(pedido);
 }
 
-// --- ticket cliente ---
 function printClienteAR(o){
   const w = window.open('', '_blank', 'width=420,height=640');
   const rows = (o.items||[]).map(it =>
@@ -898,8 +875,6 @@ function printClienteAR(o){
       <div class="muted">${fecha}</div>
       <div>Tipo: ${o.tipo} · Mesa: ${o.mesa ?? '-' } · Mozo: ${o.mozo || '-'}</div>
       ${o.nota ? `<div class="muted" style="margin:6px 0;white-space:pre-wrap;border:1px dashed #666;padding:4px">📝 ${o.nota}</div>` : ''}
-<hr>
-
       <hr>
       <table>
         <thead><tr><th>Detalle</th><th class="right">P. Unit</th><th class="right">Importe</th></tr></thead>
@@ -921,24 +896,19 @@ function printClienteAR(o){
 async function cobrarDesdeAdmin(id){
   let pedido = null;
 
+  // Buscar abierto
   try{
     if (await ensureServer()){
-      let r = await api(`/api/orders/${id}`);
+      let r = await api('/api/orders/open');
       if (r.ok){
-        pedido = await r.json();
-      } else {
-        r = await api('/api/orders');
-        if (r.ok){
-          const j = await r.json();
-          const list = j.orders || [];
-          pedido = list.find(x => String(x.id) === String(id)) || null;
-        }
+        const j = await r.json();
+        const list = Array.isArray(j)? j : (j.orders||[]);
+        pedido = list.find(x => String(x.id) === String(id)) || null;
       }
     }
   }catch{}
-  if (!pedido){
-    try{ pedido = await get('orders', id); }catch{}
-  }
+  // Fallback local
+  if (!pedido){ try{ pedido = await get('orders', id); }catch{} }
 
   if (!pedido){ alert('No se encontró el pedido.'); return; }
   if (pedido.estado && pedido.estado !== 'abierto'){
@@ -946,7 +916,7 @@ async function cobrarDesdeAdmin(id){
   }
   if (!pedido.items?.length){ alert('Pedido vacío.'); return; }
 
-  const total = pedido.items.reduce((a,b)=> a + (b.precio||0)*(b.cant||0), 0);
+  const total = (pedido.items||[]).reduce((a,b)=> a + (b.precio||0)*(b.cant||0), 0);
   const dlg = document.getElementById('dlgCobroAdmin');
   const descInp = document.getElementById('admPagoDesc');
   const addPagoBtn = document.getElementById('admAddPago');
@@ -992,14 +962,10 @@ async function cobrarDesdeAdmin(id){
           body: JSON.stringify({ estado:'cerrado', patch })
         });
         if (!r.ok) throw new Error('HTTP '+r.status+' '+await r.text());
-      } else {
-        // si querés: actualizar stock offline aquí
       }
-
-      // SIEMPRE sumar a caja local (shadow)
+      // Sumar a caja local (shadow), por las dudas
       await addVentaToLocalCash(pagos, aCobrar, { fuente: 'admin', pedidoId: pedido.id });
 
-      // Persistir localmente el pedido
       Object.assign(pedido, patch, { estado:'cerrado' });
       try{ await put('orders', pedido); }catch{}
 
@@ -1020,6 +986,7 @@ async function cobrarDesdeAdmin(id){
   dlg.showModal();
 }
 
+/* ---- Anular y otros handlers ---- */
 document.getElementById('detCerrar').onclick=()=> document.getElementById('dlgDetalle').close();
 document.getElementById('detImprimirCocina').onclick=()=>{
   if(!ultimoPedidoVisto) return;
@@ -1031,8 +998,6 @@ document.getElementById('detImprimirCocina').onclick=()=>{
   <style>@page{size:80mm auto;margin:5mm}body{font:12px/1.3 -apple-system,Segoe UI,Roboto,Arial}.muted{color:#666}</style></head><body>
   <div>Mesa: ${o.mesa??'-'} · Mozo: ${o.mozo||'-'}</div>
   ${o.nota ? `<div class="muted" style="margin:6px 0;white-space:pre-wrap;border:1px dashed #666;padding:4px">📝 ${o.nota}</div>` : ''}
-<hr>${rows}
-
   <hr>${rows}<hr><div class="muted">${fecha}</div>
   <script>window.print(); setTimeout(()=>window.close(), 300);<\/script>
   </body></html>`); w.document.close();
@@ -1045,8 +1010,6 @@ document.getElementById('detAnular').onclick=async ()=>{
   document.getElementById('dlgDetalle').close();
   alert('Pedido anulado.');
 };
-
-// Delegación de clicks para botones data-del
 document.addEventListener('click', async (e)=>{
   const btn = e.target.closest('button[data-del]');
   if (!btn) return;
@@ -1058,11 +1021,10 @@ document.addEventListener('click', async (e)=>{
   else alert('No se pudo anular.');
 });
 
-// =================== Productos ===================
+/* ---- Productos ---- */
 async function fillProd(){
   const tb=$("#tblProd tbody"); if(!tb) return; tb.innerHTML='';
   const list = uniqueById(await fetchProducts());
-
   list.forEach(p=>{
     const tr=document.createElement('tr');
     tr.innerHTML=`<td>${p.id}</td><td>${p.nombre}</td><td>${p.categoria||''}</td><td>${money(p.precio||0)}</td><td>${p.stock??''}</td><td>${p.trackStock?'Sí':'No'}</td>`;
@@ -1079,7 +1041,6 @@ async function fillProd(){
 $('#pGuardar').onclick = async ()=>{
   const precioPesos = parseFloat(($('#pPrecio').value || '0').replace(',', '.')) || 0;
   const precioCentavos = Math.round(precioPesos * 100);
-
   const prod = {
     id: $('#pId').value.trim(),
     nombre: $('#pNombre').value || $('#pId').value,
@@ -1088,7 +1049,6 @@ $('#pGuardar').onclick = async ()=>{
     categoria: document.getElementById('pCatSel').value || '',
     trackStock: document.getElementById('pTrack').checked
   };
-
   if(!prod.id) return alert('ID requerido');
   await saveProduct(prod);
   await fillProd();
@@ -1099,7 +1059,7 @@ $('#pBorrar').onclick=async()=>{
   if(confirm('¿Borrar '+id+'?')){ await deleteProduct(id); await fillProd(); }
 };
 
-// === Categorías (solo UI local) ===
+/* ---- Categorías (local) ---- */
 function getCats(){ try{ return JSON.parse(localStorage.getItem('restopos_categories')||'[]'); }catch{ return []; } }
 function saveCats(list){ localStorage.setItem('restopos_categories', JSON.stringify(Array.from(new Set(list)).filter(Boolean))); }
 function ensureDefaultCats(){ const cur=getCats(); if(!cur||cur.length===0) saveCats(['Entradas','Platos','Bebidas','Postres']); }
@@ -1139,12 +1099,10 @@ function openCatsDialog(){
 }
 document.getElementById('btnCatEditar')?.addEventListener('click', openCatsDialog);
 
-// =================== Mozos ===================
+/* ---- Mozos ---- */
 async function fillMozos(){
   const tb=$("#tblMozos tbody"); if(!tb) return; tb.innerHTML='';
-
   const list = uniqueById(await fetchMozos());
-
   list.forEach(m=>{
     const tr=document.createElement('tr');
     tr.innerHTML=`<td>${m.id}</td><td>${m.nombre}</td><td>${m.activo!==false?'Sí':'No'}</td>`;
@@ -1162,26 +1120,32 @@ $('#mBorrar').onclick=async()=>{
   if(confirm('¿Borrar mozo '+id+'?')){ await deleteMozo(id); await fillMozos(); }
 };
 
-// =================== Reportes ===================
+/* ---- Reportes (iterando /by-date) ---- */
 $('#repRun').onclick=runRep;
+function isoDayRange(dMin, dMax){
+  const out=[]; const a=new Date(dMin+'T00:00:00'); const b=new Date(dMax+'T00:00:00');
+  for(let d=new Date(a); d<=b; d.setDate(d.getDate()+1)){ out.push(d.toISOString().slice(0,10)); }
+  return out;
+}
 async function runRep(){
   const d = document.getElementById('repDesde').value || new Date().toISOString().slice(0,10);
   const h = document.getElementById('repHasta').value || new Date().toISOString().slice(0,10);
-
   let list=[];
   if (await ensureServer()){
-    const r = await api('/api/orders?estado=cerrado');
-    if (r.ok){
-      const j = await r.json();
-      list = (j.orders||[]).filter(o => (o.fecha||'') >= d && (o.fecha||'') <= h)
-                           .sort((a,b) => new Date(a.cierre) - new Date(b.cierre));
-    }
+    try{
+      const days = isoDayRange(d,h);
+      let acc=[];
+      for (const day of days){
+        const r = await api('/api/orders/by-date?date='+encodeURIComponent(day));
+        if (r.ok){ const j = await r.json(); const arr = Array.isArray(j)? j : (j.orders||[]); acc = acc.concat(arr); }
+      }
+      list = acc.sort((a,b)=> new Date(a.cierre||a.inicio) - new Date(b.cierre||b.inicio));
+    }catch{ list=[]; }
   } else {
     const all = await getAll('orders');
-    list = all.filter(o => o.estado === 'cerrado' && o.fecha >= d && o.fecha <= h)
+    list = all.filter(o => o.estado === 'cerrado' && (o.fecha||'') >= d && (o.fecha||'') <= h)
               .sort((a,b) => new Date(a.cierre) - new Date(b.cierre));
   }
-
   const tb = document.querySelector('#tblRep tbody');
   tb.innerHTML = '';
   let tot = 0;
@@ -1189,272 +1153,15 @@ async function runRep(){
     const t = (o.totalCobrado || o.total || 0);
     tot += t;
     const tr = document.createElement('tr');
-    tr.innerHTML = `<td>${new Date(o.cierre).toLocaleString()}</td>
-                    <td>${o.mesa ?? '-'}</td><td>${o.tipo}</td><td>${o.mozo || '-'}</td>
+    tr.innerHTML = `<td>${new Date(o.cierre||o.inicio).toLocaleString()}</td>
+                    <td>${o.mesa ?? '-'}</td><td>${o.tipo||''}</td><td>${o.mozo || '-'}</td>
                     <td>${money(t)}</td>`;
     tb.appendChild(tr);
   });
   document.getElementById('repTotal').textContent = money(tot);
 }
 
-function uniqueById(list){
-  const seen = new Set();
-  const out = [];
-  for (const x of list || []) {
-    const id = String(x && (x.id ?? x._id ?? ''));
-    if (!id || seen.has(id)) continue;
-    seen.add(id);
-    out.push(x);
-  }
-  return out;
-}
-
-// =================== Caja ===================
-async function renderCaja(){ 
-  let open = await getOpenCashBox(); 
-  open = normalizeBox(open);
-
-  const state = document.getElementById('boxState');
-  const openRow = document.getElementById('boxOpen');
-  const run = document.getElementById('boxRun');
-
-  if(!open){
-    state.textContent = 'No hay caja abierta.';
-    openRow.style.display = 'grid';
-    run.style.display = 'none';
-    return;
-  }
-
-  const efEsperado = calcEfEsperado(open);
-  const totalCaja  = calcTotalCaja(open);
-
-  state.innerHTML = `<div style="display:flex;gap:12px;flex-wrap:wrap">
-    <span>Apertura: ${new Date(open.aperturaTs).toLocaleString()}</span>
-    <span>Cajero: ${open.cajero || '-'}</span>
-    <span>Turno: ${open.turno || '-'}</span>
-  </div>`;
-
-  openRow.style.display = 'none';
-  run.style.display = 'block';
-
-  document.getElementById('lblAper').textContent   = new Date(open.aperturaTs).toLocaleString();
-  document.getElementById('lblInicial').textContent = money(open.apertura || 0);
-
-  document.getElementById('lblPayEfe').textContent  = money(open.ventasByPay.efectivo || 0);
-  document.getElementById('lblPayTar').textContent  = money(open.ventasByPay.tarjeta || 0);
-  document.getElementById('lblPayTra').textContent  = money(open.ventasByPay.transferencia || 0);
-  document.getElementById('lblPayQR').textContent   = money(open.ventasByPay.qr || 0);
-  document.getElementById('lblEfEsperado').textContent = money(efEsperado);
-  document.getElementById('lblTotalCaja').textContent  = money(totalCaja);
-
-  // Movimientos manuales
-  const tb = document.querySelector('#tblMov tbody');
-  tb.innerHTML = '';
-  (open.movs || [])
-    .filter(m => m.tipo === 'ingreso' || m.tipo === 'egreso')
-    .forEach(m => {
-      const tr = document.createElement('tr');
-      tr.innerHTML = `
-        <td>${new Date(m.ts).toLocaleTimeString()}</td>
-        <td>${m.tipo}</td>
-        <td>${m.medio}</td>
-        <td>${m.desc || ''}</td>
-        <td>${money(m.monto)}</td>`;
-      tb.appendChild(tr);
-    });
-
-  // Cobros del turno
-  const tbCob = document.querySelector('#tblCobrosTurno tbody');
-  if (tbCob) {
-    tbCob.innerHTML = '';
-    let totalCobros = 0;
-    (open.movs || [])
-      .filter(m => m.tipo === 'venta')
-      .forEach(m => {
-        totalCobros += (m.monto || 0);
-        const tr = document.createElement('tr');
-        tr.innerHTML = `
-          <td>${new Date(m.ts).toLocaleTimeString()}</td>
-          <td>${m.medio || '-'}</td>
-          <td>${m.desc || ''}</td>
-          <td>${m.fuente || '-'}</td>
-          <td>${m.pedidoId ?? '-'}</td>
-          <td class="right">${money(m.monto || 0)}</td>`;
-        tbCob.appendChild(tr);
-      });
-    const totCell = document.getElementById('cobrosTurnoTotal');
-    if (totCell) totCell.textContent = money(totalCobros);
-  }
-}
-
-// Abrir caja
-document.getElementById('boxAbrir').onclick = async ()=>{
-  let aperturaPesos = parseFloat(document.getElementById('boxInicial').value.replace(',', '.') || '0');
-  if (isNaN(aperturaPesos)) aperturaPesos = 0;
-  const apertura = Math.round(aperturaPesos * 100);
-
-  const cajero = document.getElementById('boxCajero').value.trim() || '';
-  const turno  = document.getElementById('boxTurno').value.trim()  || '';
-
-  if (await ensureServer()){
-    try{
-      await serverOpenCash(apertura, cajero, turno);
-    }catch(e){
-      alert('No se pudo abrir caja en servidor.\n\nDetalle: ' + (e?.message || e));
-      const box = {
-        apertura, aperturaTs: nowISO(), cajero, turno,
-        movs: [], ventasByPay:{efectivo:0,tarjeta:0,transferencia:0,qr:0,otros:0},
-        ingresosByPay:{efectivo:0,tarjeta:0,transferencia:0,qr:0,otros:0},
-        egresosByPay:{efectivo:0,tarjeta:0,transferencia:0,qr:0,otros:0},
-        ventasTotal:0, ingresosTotal:0, egresosTotal:0
-      };
-      await put('cash', box);
-    }
-  } else {
-    const box = {
-      apertura, aperturaTs: nowISO(), cajero, turno,
-      movs: [], ventasByPay:{efectivo:0,tarjeta:0,transferencia:0,qr:0,otros:0},
-      ingresosByPay:{efectivo:0,tarjeta:0,transferencia:0,qr:0,otros:0},
-      egresosByPay:{efectivo:0,tarjeta:0,transferencia:0,qr:0,otros:0},
-      ventasTotal:0, ingresosTotal:0, egresosTotal:0
-    };
-    await put('cash', box);
-  }
-
-  toast(`✅ Caja abierta con ${money(apertura)}`);
-  await renderCaja();
-};
-
-// Agregar movimiento manual
-document.getElementById('movAgregar').onclick = async ()=>{
-  let open = await getOpenCashBox(); if(!open) return; open = normalizeBox(open);
-  const tipo = document.getElementById('movTipo').value;
-  const medioSel = document.getElementById('movMedio').value;
-  const medio = medioKey(medioSel);
-  const desc = document.getElementById('movDesc').value;
-  const montoPesos = parseFloat((document.getElementById('movMonto').value || '0').replace(',', '.')) || 0;
-  const monto = Math.round(montoPesos * 100);
-
-  if (await ensureServer()){
-    try{
-      await serverAddMov(tipo, medioSel, desc, monto);
-    }catch{
-      return alert('No se pudo registrar el movimiento en servidor.');
-    }
-  } else {
-    const mov = { ts: nowISO(), tipo, medio: medioSel, desc, monto };
-    open.movs.push(mov);
-    if(tipo==='ingreso'){
-      open.ingresosTotal = (open.ingresosTotal||0) + monto;
-      open.ingresosByPay[medio] = (open.ingresosByPay[medio]||0) + monto;
-    } else {
-      open.egresosTotal = (open.egresosTotal||0) + monto;
-      open.egresosByPay[medio] = (open.egresosByPay[medio]||0) + monto;
-    }
-    await put('cash', open);
-  }
-  await renderCaja();
-};
-
-document.getElementById('boxCerrar').onclick = async ()=>{
-  let open = await getOpenCashBox(); 
-  if(!open) return alert('No hay caja abierta.');
-  open = normalizeBox(open);
-
-  const efEsperado = calcEfEsperado(open);
-  const totalCaja  = calcTotalCaja(open);
-
-  if (await ensureServer()){
-    try{
-      await serverCloseCash(efEsperado);
-      try{
-        const sh = await getLocalShadowOpenBox();
-        if (sh){
-          sh.cierre = true;
-          sh.cierreTs = nowISO();
-          await put('cash', sh);
-        }
-      }catch{}
-    }catch(e){
-      alert('No se pudo cerrar caja en servidor.\n\nDetalle: ' + (e?.message || e));
-      open.cierre = true;
-      open.cierreTs = nowISO();
-      open.conteo = efEsperado;
-      open.efectivoEsperado = efEsperado;
-      open.diferenciaEf = 0;
-      open.final = totalCaja;
-      await put('cash', open);
-    }
-  } else {
-    open.cierre = true;
-    open.cierreTs = nowISO();
-    open.conteo = efEsperado;
-    open.efectivoEsperado = efEsperado;
-    open.diferenciaEf = 0;
-    open.final = totalCaja;
-    await put('cash', open);
-  }
-
-  alert(`Caja cerrada.\nEfectivo esperado: ${money(efEsperado)}\nTotal de caja: ${money(totalCaja)}\n(Diferencia de efectivo: $ 0,00)`);
-  await renderCaja();
-  await renderHistorial();
-};
-
-// Historial de cajas
-function inRange(dayISO, d, h){ return (!d || dayISO >= d) && (!h || dayISO <= h); }
-async function renderHistorial(){
-  const tb = document.querySelector('#tblHist tbody'); if(!tb) return;
-  tb.innerHTML='';
-  const d = document.getElementById('histDesde').value;
-  const h = document.getElementById('histHasta').value;
-
-  let list=[];
-  if (await ensureServer()){
-    try{ list = await serverCashHistory(d,h); }catch{ list=[]; }
-  } else {
-    const boxes = await getAll('cash');
-    list = boxes.filter(b=>b.cierre).sort((a,b)=> new Date(a.aperturaTs)-new Date(b.aperturaTs));
-  }
-
-  list.forEach(b=>{
-    const apTs = b.aperturaTs || b.apertura_ts || '';
-    const day = (apTs||'').slice(0,10);
-    if(!inRange(day, d, h)) return;
-
-    b.ventasByPay = Object.assign(
-      {efectivo:0,tarjeta:0,transferencia:0,qr:0,otros:0},
-      b.ventasByPay || {}
-    );
-
-    const totalCaja = (typeof b.final === 'number')
-      ? b.final
-      : ((b.apertura||0) + (b.ingresosTotal||0) + (b.ventasTotal||0) - (b.egresosTotal||0));
-
-    const tr = document.createElement('tr');
-    tr.innerHTML = `
-      <td>${apTs?new Date(apTs).toLocaleString():'-'}</td>
-      <td>${b.cierreTs?new Date(b.cierreTs).toLocaleString():'-'}</td>
-      <td>${b.cajero||'-'}</td>
-      <td>${b.turno||'-'}</td>
-      <td>${money(b.apertura||0)}</td>
-      <td>${money(b.ventasTotal||0)}</td>
-      <td>${money(b.ventasByPay.efectivo||0)}</td>
-      <td>${money(b.ventasByPay.tarjeta||0)}</td>
-      <td>${money(b.ventasByPay.transferencia||0)}</td>
-      <td>${money(b.ventasByPay.qr||0)}</td>
-      <td>${money(b.ingresosTotal||0)}</td>
-      <td>${money(b.egresosTotal||0)}</td>
-      <td>${money(b.conteo||0)}</td>
-      <td>${money(b.efectivoEsperado||0)}</td>
-      <td>${money(b.diferenciaEf||0)}</td>
-      <td><b>${money(totalCaja)}</b></td>
-    `;
-    tb.appendChild(tr);
-  });
-}
-document.getElementById('histBuscar')?.addEventListener('click', renderHistorial);
-
-// === Rollback local ===
+/* ---- Rollback local (sin cambios) ---- */
 async function rollbackCajaYStock(o){
   try{
     let caja = o.boxId ? await get('cash', o.boxId) : null;
@@ -1481,7 +1188,7 @@ async function rollbackCajaYStock(o){
   }catch(e){ console.warn('Rollback falló:', e); }
 }
 
-// =================== Config ===================
+/* ---- Config ---- */
 async function loadConfigUI(){
   await loadConfigMerged();
   $('#cfgNombre').value = CONFIG.restaurantName || '';
@@ -1502,7 +1209,7 @@ $('#cfgGuardar').onclick=async()=>{
   alert('Configuración guardada en este equipo. Recargá Mozo/Admin para aplicar cambios.');
 };
 
-// =================== Boot ===================
+/* ---- Boot ---- */
 (async function boot(){
   if ('serviceWorker' in navigator) {
     try {
@@ -1535,76 +1242,24 @@ $('#cfgGuardar').onclick=async()=>{
 
   setInterval(()=>{ if(document.querySelector('.tab.active')?.dataset.v==='mesas') loadAbiertos(); },15000);
 
-// 🔄 Auto-refresh en vivo (SSE) — ADMIN
-(() => {
-  const es = new EventSource(location.origin + '/api/events');
+  /* 🔄 SSE: auto-refresh en vivo (UN SOLO BLOQUE) */
+  try{
+    const es = new EventSource(RESTO_SERVER + '/api/events');
+    es.addEventListener('hello', e => console.log('SSE admin ok', e.data));
 
-  es.addEventListener('hello', e => console.log('SSE admin ok', e.data));
+    const refreshOrders = () => { loadAbiertos(); loadPagados(); renderCaja(); };
+    es.addEventListener('orders_changed', refreshOrders);
+    es.addEventListener('order_closed',  refreshOrders);
 
-  // Cualquier cambio de pedidos => refrescá todo lo relevante
-  es.addEventListener('orders_changed', () => {
-    loadAbiertos();
-    loadPagados();
-    renderCaja();
-  });
+    es.addEventListener('cash_updated', ()=> { renderCaja(); renderHistorial(); });
+    es.addEventListener('products_changed', ()=> { fillProd(); });
+    es.addEventListener('mozos_changed', ()=> { fillMozos(); });
 
-  // Cuando un pedido se cierra explícitamente
-  es.addEventListener('order_closed', () => {
-    loadAbiertos();
-    loadPagados();
-    renderCaja();
-  });
-
-  // Cambios de caja (movimientos / apertura / cierre)
-  es.addEventListener('cash_updated', () => {
-    renderCaja();
-    renderHistorial();
-  });
-
-  // Cambios de catálogo y mozos
-  es.addEventListener('products_changed', () => { fillProd(); });
-  es.addEventListener('mozos_changed', () => { fillMozos(); });
-
-  es.onerror = (err) => console.warn('SSE admin desconectado, reintentará...', err);
+    es.onerror = (err) => console.warn('SSE admin desconectado, reintentará...', err);
+  }catch(e){ console.warn('SSE no disponible', e); }
 })();
-
-})();
-
-// === 🔄 Canal SSE: actualiza en tiempo real ===
-(async function startSSE() {
-  try {
-    const SERVER = location.origin; // Render usa el mismo dominio (no pongas localhost)
-    const es = new EventSource(SERVER + '/api/events');
-
-    es.addEventListener('hello', e => console.log('🔌 Conectado SSE:', e.data));
-
-    // 👇 Cuando hay cambio en pedidos, actualizo pantalla
-    es.addEventListener('orders_changed', async e => {
-      console.log('📦 Pedido cambiado', e.data);
-      if (typeof render === 'function') await render();
-    });
-
-    // 👇 Cuando se marca un pedido listo (útil en cocina/mozo)
-    es.addEventListener('pedido_listo', async e => {
-      console.log('✅ Pedido listo', e.data);
-      if (typeof render === 'function') await render();
-    });
-
-    // 👇 Cuando cambian mozos o productos (opcional)
-    es.addEventListener('mozos_changed', async e => {
-      if (typeof render === 'function') await render();
-    });
-    es.addEventListener('products_changed', async e => {
-      if (typeof render === 'function') await render();
-    });
-
-    es.onerror = err => console.warn('⚠️ SSE desconectado, reintentando...', err);
-  } catch (err) {
-    console.error('❌ Error SSE:', err);
-  }
-})();
-
 </script>
+
 
 
 </body>

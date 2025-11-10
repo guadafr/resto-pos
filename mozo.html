@@ -134,34 +134,29 @@
 </dialog>
 
 <script>
+/* ============================================================
+   RestoPOS — MOZO (compatible con server /api/orders/open y /api/orders/:id/charge)
+   ============================================================ */
 
-// ====== RestoPOS: bootstrap de red seguro (usar en MOZO / ADMIN / COCINA) ======
+/* ====== Bootstrap de red seguro ====== */
 (() => {
-  // 1) Servidor destino
-  // - En Render: forzamos mismo origen (https) para evitar Mixed Content.
-  // - En local (http://localhost): permitimos host/puerto guardados.
   const savedHost = localStorage.getItem('restopos_server_host');
   const savedPort = localStorage.getItem('restopos_server_port');
-
   const IS_LOCAL = ['localhost','127.0.0.1','::1'].includes(location.hostname);
-  let SERVER = location.origin; // default seguro (Render)
 
+  let SERVER = location.origin; // seguro para Render/producción
   if (IS_LOCAL && location.protocol !== 'https:') {
     const host = savedHost || 'localhost';
     const port = Number(savedPort) || 3002;
     SERVER = `${location.protocol}//${host}:${port}`;
   }
-
-  // Exponer para el resto del código
   window.RESTO_SERVER = SERVER;
-  console.log('[RestoPOS] SERVER =', SERVER);
+  console.log('[RestoPOS MOZO] SERVER =', SERVER);
 
-  // 2) fetch helper con timeout y headers por defecto
   const DEFAULT_HEADERS = { 'Content-Type': 'application/json' };
-
   function api(path, opt = {}) {
     const controller = new AbortController();
-    const t = setTimeout(() => controller.abort(), opt.timeoutMs ?? 8000); // 8s
+    const t = setTimeout(() => controller.abort(), opt.timeoutMs ?? 8000);
     const url = `${SERVER}${path}`;
     const fetchOpts = {
       method: opt.method || 'GET',
@@ -174,29 +169,20 @@
     };
     return fetch(url, fetchOpts).finally(() => clearTimeout(t));
   }
-
   window.api = api;
 
-  // 3) healthcheck con memo (evita spamear ping)
   let SERVER_OK = false;
   let _lastPing = 0;
-
   async function ensureServer() {
     const now = Date.now();
     if (now - _lastPing < 5000) return SERVER_OK;
     _lastPing = now;
-    try {
-      const r = await api('/api/ping', { timeoutMs: 4000 });
-      SERVER_OK = r.ok;
-    } catch {
-      SERVER_OK = false;
-    }
+    try { const r = await api('/api/ping', { timeoutMs: 4000 }); SERVER_OK = r.ok; }
+    catch { SERVER_OK = false; }
     return SERVER_OK;
   }
-
   window.ensureServer = ensureServer;
 
-  // 4) utilidades rápidas
   window.toast = (msg) => {
     try {
       const d = document.createElement('div');
@@ -207,47 +193,36 @@
     } catch {}
   };
 
-  // 5) “botón de pánico”: /?reset=1 → limpia SW + host/port y recarga
+  // Botón de pánico → /?reset=1
   (async () => {
     const u = new URL(location.href);
     if (u.searchParams.get('reset') === '1') {
       try {
-        // limpiar overrides
         localStorage.removeItem('restopos_server_host');
         localStorage.removeItem('restopos_server_port');
-
-        // desregistrar todos los SW
         if ('serviceWorker' in navigator) {
           const regs = await navigator.serviceWorker.getRegistrations();
           await Promise.all(regs.map(r => r.unregister().catch(()=>{})));
         }
-        // limpiar caches
         if (window.caches) {
           const names = await caches.keys();
           await Promise.all(names.map(n => caches.delete(n)));
         }
-        // recargar limpio (sin el reset)
         u.searchParams.delete('reset');
         location.replace(u.toString());
-        return;
-      } catch (e) {
-        console.warn('reset error', e);
-      }
+      } catch (e) { console.warn('reset error', e); }
     }
   })();
-
 })();
 
-
-
-// === CONFIG merge
+/* ====== CONFIG merge ====== */
 let CONFIG = { restaurantName:'Mi Restaurante', adminPin:'1234', tables:20, autoPrintKitchenOnSave:false, autoPrintKitchenOnCharge:true };
 async function loadConfigMerged(){
   try{ const cfgJSON = await fetch('config.json',{cache:'no-store'}).then(r=>r.ok?r.json():Promise.reject()); Object.assign(CONFIG, cfgJSON||{}); }catch{}
   try{ const cfgLocal = JSON.parse(localStorage.getItem('restopos_config')||'{}'); Object.assign(CONFIG, cfgLocal||{}); }catch{}
 }
 
-// === IndexedDB helpers (offline)
+/* ====== IndexedDB (offline) ====== */
 const DB_NAME='restoDBv23', DB_VER=1; let db;
 function openDB(){ return new Promise((res,rej)=>{ const req=indexedDB.open(DB_NAME,DB_VER);
   req.onupgradeneeded=e=>{ const db=e.target.result;
@@ -260,13 +235,18 @@ function tx(s,m='readonly'){return db.transaction(s,m).objectStore(s)}
 function put(s,v){return new Promise((res,rej)=>{const r=tx(s,'readwrite').put(v); r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error)})}
 function getAll(s){return new Promise((res,rej)=>{const r=tx(s).getAll(); r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error)})}
 function get(s,id){return new Promise((res,rej)=>{const r=tx(s).get(id); r.onsuccess=()=>res(r.result); r.onerror=()=>rej(r.error)})}
+
+/* ====== Utils & estado ====== */
 const $=s=>document.querySelector(s), $$=s=>Array.from(document.querySelectorAll(s));
-function money(n){return '$ '+(n/100).toFixed(2)} function today(){return new Date().toISOString().slice(0,10)} function nowISO(){return new Date().toISOString()}
+function money(n){return '$ '+(n/100).toFixed(2)}
+function today(){return new Date().toISOString().slice(0,10)}
+function nowISO(){return new Date().toISOString()}
+function genCID(){ return 'c_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
 
 let currentView='SALON', currentOrder=null, MESAS=[];
 function buildMesas(n){ MESAS = Array.from({length:n}, (_,i)=>({numero:i+1})); }
 
-// ======== DATA LAYER (servidor + fallback) ========
+/* ====== DATA LAYER (server + fallback) ====== */
 async function fetchProducts(){
   if (await ensureServer()){
     const r = await api('/api/products');
@@ -289,48 +269,43 @@ async function fetchOpenOrders(tipo){
   if (await ensureServer()){
     const r = await api('/api/orders/open');
     if(!r.ok) throw new Error('orders');
-    const j = await r.json(); 
-    const list = j.orders || [];
+    const j = await r.json();
+    const list = Array.isArray(j) ? j : (j.orders || []);
     return tipo ? list.filter(o=>o.tipo===tipo) : list;
   }
   const all = await getAll('orders');
   return all.filter(o=>o.estado==='abierto' && (!tipo || o.tipo===tipo));
 }
-let __saving = false, __saveAgain = false;
 
+/* — Guardado robusto con clientId anti-duplicados — */
+let __saving = false, __saveAgain = false;
 async function saveOrder(order){
-  order.clientId = order.clientId || genCID(); // importante
+  order.clientId = order.clientId || genCID();      // 🔒 clave contra duplicados
   async function doSave() {
     const r = await api('/api/orders', { method:'POST', body: JSON.stringify(order) });
     if (!r.ok) throw new Error('save order');
     const js = await r.json().catch(()=>({}));
-    if (js && js.order) Object.assign(order, js.order); // asegura id asignado
+    if (js && js.order) Object.assign(order, js.order); // asegura id
     return order;
   }
   if (__saving) { __saveAgain = true; return order; }
   __saving = true;
-  try {
-    order = await doSave();
-  } finally {
+  try { order = await doSave(); }
+  finally {
     __saving = false;
     if (__saveAgain) { __saveAgain = false; try { order = await doSave(); } catch {} }
   }
   return order;
 }
 
-
-
-// ⬇️ acepta también 'nota' en el payload de cobro
+/* — Cobro (impacta /cash en el server) — */
 async function chargeOrder(id, pagos, descuento, nota){
   const r = await api(`/api/orders/${id}/charge`, { method:'POST', body: JSON.stringify({ pagos, descuento, nota }) });
   if (!r.ok) throw new Error('charge');
   return true;
 }
-function genCID() {
-  return 'c_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
-}
 
-// ---- Caja (server) ----
+/* ====== Caja (server y shadow offline) ====== */
 async function serverGetOpenCash(){
   try{
     const r = await api('/api/cash/open', { timeoutMs: 5000 });
@@ -340,15 +315,10 @@ async function serverGetOpenCash(){
   }catch{ return null; }
 }
 async function serverOpenCash(apertura=0, cajero='Mozo', turno='Auto'){
-  const r = await api('/api/cash/open', {
-    method:'POST',
-    body: JSON.stringify({ apertura, cajero, turno })
-  });
+  const r = await api('/api/cash/open', { method:'POST', body: JSON.stringify({ apertura, cajero, turno }) });
   if (!r.ok) throw new Error('open_cash_failed');
   return await r.json();
 }
-
-// ---- Shadow box local (solo si NO hay server) ----
 function mapPagoKey(tipo=''){
   const t = String(tipo).toLowerCase();
   if (t.includes('efectivo')) return 'efectivo';
@@ -402,8 +372,7 @@ async function addVentaToLocalCash(pagos, total, meta={ fuente:'mozo', pedidoId:
   await saveLocalShadowBox(box);
 }
 
-
-// ======== UI: Grid de mesas ========
+/* ====== UI: Grid de mesas ====== */
 async function renderGrid(){
   const open = await fetchOpenOrders(currentView);
   const map = new Map(open.map(o=>[o.mesa,o]));
@@ -412,13 +381,13 @@ async function renderGrid(){
     const o=map.get(m.numero);
     const div=document.createElement('div'); div.className='tile '+(o?'':'free');
     div.innerHTML=`<div style="display:flex;justify-content:space-between"><b>Mesa ${String(m.numero).padStart(2,'0')}</b><span class="pill">${currentView}</span></div>
-                   <div style="display:flex;justify-content:space-between"><span>${o? (o.mozo||'—'):'—'}</span><span>${o? money(o.total||0):'Libre'}</span></div>`;
+                   <div style="display:flex;justify-content:space-between"><span>${o? (o.mozo||'—'):'—'}</span><span>${o? money(o.total||((o.items||[]).reduce((a,b)=>a+(b.precio||0)*(b.cant||0),0))):'Libre'}</span></div>`;
     div.onclick=async()=> { o ? openOrder(m.numero, o) : openOrder(m.numero, null); };
     grid.appendChild(div);
   });
 }
 
-// --- Notificaciones locales entre pestañas ---
+/* ====== Notificaciones locales entre pestañas ====== */
 const BC = new BroadcastChannel('restopos');
 function notifyAll(type, payload){
   try{ BC.postMessage({type, payload, ts: Date.now()}); }catch(e){}
@@ -448,7 +417,7 @@ BC.onmessage = (e)=>{
   }
 };
 
-// ======== Menú y Pedido ========
+/* ====== Menú y Pedido ====== */
 async function renderMenu(){
   const list=await fetchProducts();
   const ul=$("#listaMenu"); ul.innerHTML='';
@@ -483,14 +452,12 @@ async function renderMenu(){
     else currentOrder.items.push({id:p.id,nombre:p.nombre,precio:p.precio,cant:1});
 
     currentOrder.total = currentOrder.items.reduce((a,b)=>a+b.precio*b.cant,0);
-    // 🔸 guardar también nota por si el mozo ya escribió algo
-    currentOrder.nota = ($('#pedidoObs')?.value||'').trim();
+    currentOrder.nota = ($('#pedidoObs')?.value||'').trim();  // 📝 guardar nota
     currentOrder = await saveOrder(currentOrder);
     renderPedido();
     renderGrid();
   });
 }
-
 function renderPedido(){
   const tb=$("#tblPedido tbody"); tb.innerHTML='';
   currentOrder.items.forEach((it,i)=>{
@@ -515,39 +482,32 @@ function renderPedido(){
     currentOrder = await saveOrder(currentOrder); renderPedido(); renderGrid();
   });
 }
-
 async function loadMozos(){
   const list=await fetchMozos(); const sel=$("#selMozo"); sel.innerHTML='';
   list.filter(m=>m.activo!==false).forEach(m=>{ const o=document.createElement('option'); o.value=m.nombre; o.textContent=m.nombre; sel.appendChild(o); });
   if(!sel.value && sel.options.length){ sel.value=sel.options[0].value; }
 }
-
 async function openOrder(mesa, existing){
   if(!existing){
-  currentOrder = {
-    mesa, tipo:currentView, estado:'abierto',
-    inicio:nowISO(), fecha:today(), items:[], total:0, mozo:'', workflow:'pendiente', nota:'',
-    clientId: genCID()  // 🔴 NUEVO
-  };
-  currentOrder = await saveOrder(currentOrder);
-} else {
-  currentOrder = existing;
-  if (!currentOrder.clientId) { currentOrder.clientId = genCID(); currentOrder = await saveOrder(currentOrder); }
-}
+    currentOrder = {
+      mesa, tipo:currentView, estado:'abierto',
+      inicio:nowISO(), fecha:today(), items:[], total:0, mozo:'', workflow:'pendiente', nota:'',
+      clientId: genCID()
+    };
+    currentOrder = await saveOrder(currentOrder);
+  } else {
+    currentOrder = existing;
+    if (!currentOrder.clientId) { currentOrder.clientId = genCID(); currentOrder = await saveOrder(currentOrder); }
+  }
 
   $('#tituloPedido').textContent = (mesa?`Mesa ${String(mesa).padStart(2,'0')}`:'Venta rápida')+' · '+currentView;
   await loadMozos(); $("#selMozo").value=currentOrder.mozo||$("#selMozo").value||'';
   $("#pedidoMeta").textContent='Abierto '+new Date(currentOrder.inicio).toLocaleTimeString();
   await renderMenu(); renderPedido();
 
-  // 🔸 precargar nota en textarea y escuchar cambios
   const t = $('#pedidoObs');
-  if (t){
-    t.value = currentOrder.nota || '';
-    t.oninput = ()=> { currentOrder.nota = (t.value||'').trim(); };
-  }
+  if (t){ t.value = currentOrder.nota || ''; t.oninput = ()=> { currentOrder.nota = (t.value||'').trim(); }; }
 
-  // 🔸 wire de botones rápidos de observaciones
   $$('.btnObs').forEach(b=>{
     b.onclick=()=>{
       const txt=b.dataset.obs||'';
@@ -555,19 +515,15 @@ async function openOrder(mesa, existing){
       const cur=(t.value||'').trim();
       if (!cur.includes(txt)){
         t.value = cur ? (cur+', '+txt) : txt;
-        // reflejar en modelo
         currentOrder.nota = t.value.trim();
       }
     };
   });
 
   $("#dlgPedido").showModal();
-
   document.getElementById('selWorkflow').value = currentOrder.workflow || 'pendiente';
 }
-
 $("#selMozo").onchange=async e=>{ currentOrder.mozo=e.target.value; currentOrder = await saveOrder(currentOrder); renderGrid(); }
-
 $("#selWorkflow").onchange=async e=>{
   currentOrder.workflow=e.target.value;
   currentOrder = await saveOrder(currentOrder);
@@ -576,35 +532,28 @@ $("#selWorkflow").onchange=async e=>{
     notifyAll('pedido_listo', { id: currentOrder.id, mesa: currentOrder.mesa, mozo: currentOrder.mozo, items: currentOrder.items });
   }
 };
-
 $("#cerrarPedido").onclick=()=>$("#dlgPedido").close();
 
-// Guardar (envía a cocina)
+/* ====== Guardar (envía a cocina) ====== */
 $("#btnGuardar").onclick = async () => {
   if (!currentOrder) return;
-  // 🔸 guardar nota antes de persistir
   currentOrder.nota = ($('#pedidoObs')?.value||'').trim();
   if (!currentOrder.workflow) currentOrder.workflow = 'pendiente';
-
   currentOrder = await saveOrder(currentOrder);
-
   try { 
     notifyAll('pedido_nuevo', { id: currentOrder.id, mesa: currentOrder.mesa, mozo: currentOrder.mozo, items: currentOrder.items, nota: currentOrder.nota||'' });
   } catch {}
-
   toast('✅ Pedido enviado a cocina');
   $("#dlgPedido").close();
   renderGrid();
 };
-
 $("#btnCocina").onclick=()=>{
   if(!currentOrder || currentOrder.items.length===0) return alert('Pedido vacío');
-  // 🔸 asegurar nota
   currentOrder.nota = ($('#pedidoObs')?.value||'').trim();
   printCocina(currentOrder);
 };
 
-// ======== Cobro ========
+/* ====== Cobro ====== */
 document.getElementById('btnCobrar').onclick = ()=>{
   if (!currentOrder || currentOrder.items.length===0) return alert('Pedido vacío');
   const total = currentOrder.items.reduce((a,b)=> a + b.precio*b.cant, 0);
@@ -613,7 +562,6 @@ document.getElementById('btnCobrar').onclick = ()=>{
   document.getElementById('dlgCobro').showModal();
 };
 document.getElementById('cobroCerrar').onclick = () => document.getElementById('dlgCobro').close();
-
 document.getElementById('pagoOk').onclick = async ()=>{
   if (!currentOrder || currentOrder.items.length===0) return alert('Pedido vacío');
 
@@ -626,26 +574,21 @@ document.getElementById('pagoOk').onclick = async ()=>{
     return alert(`La suma de pagos (${money(sumaPagos)}) debe igualar el total a cobrar (${money(aCobrar)}).`);
   }
 
-  // 1) Guardar items + nota vigente
+  // Guardar items + nota
   currentOrder.nota = ($('#pedidoObs')?.value||'').trim();
   currentOrder = await saveOrder(currentOrder);
 
-  // 2) Cobro
   try{
     if (await ensureServer()){
-      // 2.a) asegurar caja abierta en server
       let open = await serverGetOpenCash();
       if (!open){
         const ok = confirm('No hay caja abierta en el servidor. ¿Abrir caja con $0 ahora?');
-        if (!ok) return; // sin caja no impacta ventas en /cash
+        if (!ok) return;
         await serverOpenCash(0, 'Mozo', 'Auto');
       }
-
-      // 2.b) cerrar pedido en server (impacta caja del server)
-      await chargeOrder(currentOrder.id, pagos, desc, currentOrder.nota);
-      // ✅ NO registrar shadow local aquí (evitamos doble conteo).
+      await chargeOrder(currentOrder.id, pagos, desc, currentOrder.nota); // impacta caja server
     } else {
-      // 2.c) OFFLINE: impactar stock + cerrar local + shadow box local (para ver en Admin)
+      // OFFLINE → cerrar local + shadow
       const prods = await getAll('products');
       currentOrder.items.forEach(it=>{
         const p = prods.find(x=>String(x.id)===String(it.id));
@@ -653,8 +596,6 @@ document.getElementById('pagoOk').onclick = async ()=>{
       });
       Object.assign(currentOrder, { pagos, descuento: desc, total, totalCobrado: aCobrar, cierre: nowISO(), estado:'cerrado' });
       await saveOrder(currentOrder);
-
-      // 👉 sumar a caja local (shadow) para que Admin/Caja lo vea hasta que vuelva el server
       await addVentaToLocalCash(pagos, aCobrar, { fuente:'mozo', pedidoId: currentOrder.id });
     }
   }catch(e){
@@ -662,23 +603,19 @@ document.getElementById('pagoOk').onclick = async ()=>{
     return alert('No se pudo cerrar el pedido. Verificá conexión o reintentá.');
   }
 
-  // 3) Tickets
   if (CONFIG?.autoPrintKitchenOnCharge) printCocina(currentOrder);
   printClienteAR(Object.assign({}, currentOrder, { pagos, descuento: desc, total, totalCobrado: aCobrar, cierre: nowISO() }));
 
-  // 4) Cerrar diálogos y refrescar
   document.getElementById('dlgCobro').close();
   document.getElementById('dlgPedido').close();
   renderGrid();
   toast('✅ Cobro registrado');
 };
 
-
-
+/* ====== Cancelación ====== */
 document.getElementById('btnCancelar').onclick = async () => {
   if (!currentOrder) return;
   if (!confirm('¿Cancelar este pedido?')) return;
-
   if (await ensureServer()){
     await api(`/api/orders/${currentOrder.id}/status`, { method:'POST', body: JSON.stringify({ estado:'anulado', motivo:'Cancelado desde Mozo' }) });
     currentOrder.estado = 'anulado';
@@ -692,7 +629,7 @@ document.getElementById('btnCancelar').onclick = async () => {
   alert('Pedido cancelado.');
 };
 
-// ---- Pago UI helpers ----
+/* ====== Pago UI helpers ====== */
 function nuevaFilaPagoRow(pago={tipo:'Efectivo', obs:'', monto:0}){
   const tr = document.createElement('tr');
   tr.innerHTML = `
@@ -736,10 +673,10 @@ function actualizarResumenPagos(){
   el.textContent = `Subtotal ${money(total)} - Desc ${money(desc)} = A cobrar ${money(aCobrar)} · Pagos ${money(suma)} · Dif ${money(diff)}`;
 }
 
-// ---- Print helpers ----
+/* ====== Print helpers ====== */
 function printCocina(o){
   const w=window.open('','_blank','width=400,height=600');
-  const rows=o.items.map(it=>`<div>${it.cant} x ${it.nombre}</div>`).join('');
+  const rows=(o.items||[]).map(it=>`<div>${it.cant} x ${it.nombre}</div>`).join('');
   const fecha=new Date(o.cierre||o.inicio).toLocaleString();
   w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Comanda</title>
   <style>@page{size:80mm auto;margin:5mm}body{font:12px/1.3 -apple-system,Segoe UI,Roboto,Arial}.muted{color:#666}</style></head><body>
@@ -752,7 +689,7 @@ function printCocina(o){
 function moneyFmt(n){ return '$ ' + (n/100).toFixed(2); }
 function printClienteAR(o){
   const w = window.open('', '_blank', 'width=420,height=640');
-  const rows = o.items.map(it =>
+  const rows = (o.items||[]).map(it =>
     `<tr><td>${it.cant} x ${it.nombre}</td><td class="right">${moneyFmt(it.precio)}</td><td class="right">${moneyFmt(it.precio*it.cant)}</td></tr>`
   ).join('');
   const fecha = new Date(o.cierre || o.inicio).toLocaleString();
@@ -763,8 +700,9 @@ function printClienteAR(o){
     const total  = o.total || 0;
     const desc   = o.descuento || 0;
     const neto   = Math.max(0, total - desc);
-    const pagoTxt = o.pagos?.length ? o.pagos.map(p=>`${p.tipo}${p.obs?(' '+p.obs):''} $${(p.monto/100).toFixed(2)}`).join(' / ')
-                   : (o.pago?.tipo || '—') + (o.pago?.obs ? (' · '+o.pago.obs) : '');
+    const pagoTxt = o.pagos?.length
+      ? o.pagos.map(p=>`${p.tipo}${p.obs?(' '+p.obs):''} $${(p.monto/100).toFixed(2)}`).join(' / ')
+      : (o.pago?.tipo || '—') + (o.pago?.obs ? (' · '+o.pago.obs) : '');
     w.document.write(`<!doctype html><html><head><meta charset="utf-8"><title>Ticket</title>
       <style>@page{size:80mm auto;margin:5mm}
       body{font:12px/1.45 -apple-system,Segoe UI,Roboto,Arial}
@@ -795,8 +733,14 @@ function printClienteAR(o){
   }).catch(()=>{ try{ w.close(); }catch(e){} });
 }
 
-// ---- Boot ----
-document.querySelector('.tabs').onclick=e=>{ const b=e.target.closest('.tab'); if(!b)return; document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active')); b.classList.add('active'); currentView=b.dataset.v; renderGrid(); };
+/* ====== Boot + pestañas ====== */
+document.querySelector('.tabs').onclick=e=>{
+  const b=e.target.closest('.tab'); if(!b)return;
+  document.querySelectorAll('.tab').forEach(x=>x.classList.remove('active'));
+  b.classList.add('active');
+  currentView=b.dataset.v;
+  renderGrid();
+};
 document.getElementById('btnSalir').onclick=()=>{ location.href='index.html?v=237'; };
 document.getElementById('btnVentaRapida').onclick=()=>{ currentView='LLEVAR'; openOrder(null,null); };
 
@@ -813,7 +757,7 @@ document.getElementById('btnVentaRapida').onclick=()=>{ currentView='LLEVAR'; op
   await loadConfigMerged();
   buildMesas(CONFIG.tables||20);
 
-  // Demo local si no hay servidor
+  // Datos demo local si no hay server
   if (!(await ensureServer())){
     const prods=await getAll('products'); if(prods.length===0){
       for (const p of [
@@ -832,74 +776,77 @@ document.getElementById('btnVentaRapida').onclick=()=>{ currentView='LLEVAR'; op
 
   await renderGrid();
 
-  // SSE
-// 🔄 Auto-refresh en vivo (SSE) — MOZO
-(() => {
-  const es = new EventSource(location.origin + '/api/events');
+  /* 🔄 SSE: auto-refresh en vivo (UN SOLO BLOQUE) */
+  try{
+    const es = new EventSource(RESTO_SERVER + '/api/events');
+    es.addEventListener('hello', e => console.log('SSE mozo ok', e.data));
 
-  es.addEventListener('hello', e => console.log('SSE mozo ok', e.data));
+    // Cualquier cambio de pedidos => refrescar grilla
+    const refreshGrid = () => renderGrid();
+    es.addEventListener('orders_changed', refreshGrid);
+    es.addEventListener('order_closed',   refreshGrid);
 
-  // Cualquier cambio de pedidos => refrescar grilla
-  es.addEventListener('orders_changed', () => { renderGrid(); });
-  es.addEventListener('order_closed',    () => { renderGrid(); });
+    // Cambios de catálogo / mozos (opcional: podés recargar menú o mozos)
+    es.addEventListener('products_changed', () => { renderGrid(); });
+    es.addEventListener('mozos_changed',    () => { renderGrid(); });
 
-  // Cambios de catálogo / mozos
-  es.addEventListener('products_changed', () => { /* si querés: recargar menú */ renderGrid(); });
-  es.addEventListener('mozos_changed',    () => { /* si querés: recargar mozos */ renderGrid(); });
+    // Si el server emite "pedido_listo"
+    es.addEventListener('pedido_listo', (e) => {
+      try{
+        const payload = JSON.parse(e.data||'{}');
+        toast(`✅ Pedido listo · Mesa ${payload.mesa ?? '-'} · ${payload.mozo || '-'}`);
+        try{ new Audio('beep.mp3').play().catch(()=>{});}catch{}
+      }catch{}
+      renderGrid();
+    });
 
-  // Si el server llegara a emitir "pedido_listo"
-  es.addEventListener('pedido_listo', (e) => {
-    try{
-      const payload = JSON.parse(e.data||'{}');
-      const d=document.createElement('div');
-      d.textContent=`✅ Pedido listo · Mesa ${payload.mesa ?? '-'} · ${payload.mozo || '-'}`;
-      d.style.cssText='position:fixed;right:12px;bottom:12px;background:#1e293b;color:#e8eef7;padding:10px 12px;border:1px solid #2b3b59;border-radius:10px;z-index:99999';
-      document.body.appendChild(d); setTimeout(()=>d.remove(), 3500);
-      try{ new Audio('beep.mp3').play().catch(()=>{});}catch{}
-    }catch{}
-    renderGrid();
+    es.onerror = (err) => console.warn('SSE mozo desconectado, reintentará...', err);
+  }catch(e){ console.warn('SSE no disponible', e); }
+})();
+
+/* ====== Pago UI helpers ====== */
+function nuevaFilaPagoRow(pago={tipo:'Efectivo', obs:'', monto:0}){
+  const tr = document.createElement('tr');
+  tr.innerHTML = `
+    <td>
+      <select class="p-tipo">
+        <option>Efectivo</option><option>Tarjeta</option>
+        <option>Transferencia</option><option>QR</option>
+      </select>
+    </td>
+    <td><input class="p-obs" placeholder="Ej: Visa, QR MP, banco..."></td>
+    <td><input class="p-monto" type="number" min="0" value="${(pago.monto||0)/100}"></td>
+    <td><button class="btn p-del">X</button></td>`;
+  tr.querySelector('.p-tipo').value = pago.tipo || 'Efectivo';
+  tr.querySelector('.p-obs').value  = pago.obs  || '';
+  return tr;
+}
+function leerPagosDesdeTabla(){
+  const rows = Array.from(document.querySelectorAll('#tblPagos tbody tr'));
+  return rows.map(r => {
+    const tipo  = r.querySelector('.p-tipo').value;
+    const obs   = r.querySelector('.p-obs').value.trim();
+    const monto = Math.max(0, Math.round(parseFloat(r.querySelector('.p-monto').value || '0') * 100));
+    return { tipo, obs, monto };
   });
-
-  es.onerror = (err) => console.warn('SSE mozo desconectado, reintentará...', err);
-})();
-
-})();
-
-
-// === 🔄 Canal SSE: actualiza en tiempo real ===
-(async function startSSE() {
-  try {
-    const SERVER = location.origin; // Render usa el mismo dominio (no pongas localhost)
-    const es = new EventSource(SERVER + '/api/events');
-
-    es.addEventListener('hello', e => console.log('🔌 Conectado SSE:', e.data));
-
-    // 👇 Cuando hay cambio en pedidos, actualizo pantalla
-    es.addEventListener('orders_changed', async e => {
-      console.log('📦 Pedido cambiado', e.data);
-      if (typeof render === 'function') await render();
-    });
-
-    // 👇 Cuando se marca un pedido listo (útil en cocina/mozo)
-    es.addEventListener('pedido_listo', async e => {
-      console.log('✅ Pedido listo', e.data);
-      if (typeof render === 'function') await render();
-    });
-
-    // 👇 Cuando cambian mozos o productos (opcional)
-    es.addEventListener('mozos_changed', async e => {
-      if (typeof render === 'function') await render();
-    });
-    es.addEventListener('products_changed', async e => {
-      if (typeof render === 'function') await render();
-    });
-
-    es.onerror = err => console.warn('⚠️ SSE desconectado, reintentando...', err);
-  } catch (err) {
-    console.error('❌ Error SSE:', err);
-  }
-})();
-
+}
+function renderTablaPagos(pagos){
+  const tb = document.querySelector('#tblPagos tbody'); tb.innerHTML='';
+  pagos.forEach(p => tb.appendChild(nuevaFilaPagoRow(p)));
+  tb.querySelectorAll('.p-del').forEach(btn => { btn.onclick = (e)=> { e.target.closest('tr').remove(); actualizarResumenPagos(); }; });
+  tb.querySelectorAll('select,input').forEach(el => el.oninput = actualizarResumenPagos);
+  actualizarResumenPagos();
+}
+function actualizarResumenPagos(){
+  const desc = Math.max(0, parseInt(document.getElementById('pagoDesc').value || '0'));
+  const total = currentOrder.items.reduce((a,b)=> a + b.precio*b.cant, 0);
+  const aCobrar = Math.max(0, total - desc);
+  const pagos = leerPagosDesdeTabla();
+  const suma = pagos.reduce((a,p)=> a + p.monto, 0);
+  const diff = aCobrar - suma;
+  const el = document.getElementById('pagoResumen');
+  el.textContent = `Subtotal ${money(total)} - Desc ${money(desc)} = A cobrar ${money(aCobrar)} · Pagos ${money(suma)} · Dif ${money(diff)}`;
+}
 </script>
 
 

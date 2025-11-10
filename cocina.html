@@ -52,22 +52,15 @@
     </div>
   </div>
 </main>
-
 <script>
 /* =======================
    SERVER CONFIG COMÚN
    ======================= */
-// Permite override guardado:
-// ====== RestoPOS: bootstrap de red seguro (usar en MOZO / ADMIN / COCINA) ======
 (() => {
-  // 1) Servidor destino
-  // - En Render: forzamos mismo origen (https) para evitar Mixed Content.
-  // - En local (http://localhost): permitimos host/puerto guardados.
   const savedHost = localStorage.getItem('restopos_server_host');
   const savedPort = localStorage.getItem('restopos_server_port');
-
   const IS_LOCAL = ['localhost','127.0.0.1','::1'].includes(location.hostname);
-  let SERVER = location.origin; // default seguro (Render)
+  let SERVER = location.origin; // seguro (Render/https)
 
   if (IS_LOCAL && location.protocol !== 'https:') {
     const host = savedHost || 'localhost';
@@ -75,16 +68,13 @@
     SERVER = `${location.protocol}//${host}:${port}`;
   }
 
-  // Exponer para el resto del código
   window.RESTO_SERVER = SERVER;
   console.log('[RestoPOS] SERVER =', SERVER);
 
-  // 2) fetch helper con timeout y headers por defecto
   const DEFAULT_HEADERS = { 'Content-Type': 'application/json' };
-
   function api(path, opt = {}) {
     const controller = new AbortController();
-    const t = setTimeout(() => controller.abort(), opt.timeoutMs ?? 8000); // 8s
+    const t = setTimeout(() => controller.abort(), opt.timeoutMs ?? 8000);
     const url = `${SERVER}${path}`;
     const fetchOpts = {
       method: opt.method || 'GET',
@@ -97,78 +87,55 @@
     };
     return fetch(url, fetchOpts).finally(() => clearTimeout(t));
   }
-
   window.api = api;
 
-  // 3) healthcheck con memo (evita spamear ping)
   let SERVER_OK = false;
   let _lastPing = 0;
-
   async function ensureServer() {
     const now = Date.now();
     if (now - _lastPing < 5000) return SERVER_OK;
     _lastPing = now;
-    try {
-      const r = await api('/api/ping', { timeoutMs: 4000 });
-      SERVER_OK = r.ok;
-    } catch {
-      SERVER_OK = false;
-    }
+    try { const r = await api('/api/ping', { timeoutMs: 4000 }); SERVER_OK = r.ok; }
+    catch { SERVER_OK = false; }
     return SERVER_OK;
   }
-
   window.ensureServer = ensureServer;
 
-  // 4) utilidades rápidas
   window.toast = (msg) => {
-    try {
-      const d = document.createElement('div');
-      d.textContent = msg;
-      d.style.cssText = 'position:fixed;right:12px;bottom:12px;background:#1e293b;color:#e8eef7;padding:10px 12px;border:1px solid #2b3b59;border-radius:10px;z-index:999999';
-      document.body.appendChild(d);
-      setTimeout(() => d.remove(), 3500);
-    } catch {}
+    const d = document.createElement('div');
+    d.textContent = msg;
+    d.style.cssText = 'position:fixed;right:12px;bottom:12px;background:#1e293b;color:#e8eef7;padding:10px 12px;border:1px solid #2b3b59;border-radius:10px;z-index:999999';
+    document.body.appendChild(d);
+    setTimeout(() => d.remove(), 3500);
   };
 
-  // 5) “botón de pánico”: /?reset=1 → limpia SW + host/port y recarga
+  // /?reset=1 → limpiar SW/caches y recargar
   (async () => {
     const u = new URL(location.href);
     if (u.searchParams.get('reset') === '1') {
       try {
-        // limpiar overrides
         localStorage.removeItem('restopos_server_host');
         localStorage.removeItem('restopos_server_port');
-
-        // desregistrar todos los SW
         if ('serviceWorker' in navigator) {
           const regs = await navigator.serviceWorker.getRegistrations();
           await Promise.all(regs.map(r => r.unregister().catch(()=>{})));
         }
-        // limpiar caches
         if (window.caches) {
           const names = await caches.keys();
           await Promise.all(names.map(n => caches.delete(n)));
         }
-        // recargar limpio (sin el reset)
         u.searchParams.delete('reset');
         location.replace(u.toString());
-        return;
-      } catch (e) {
-        console.warn('reset error', e);
-      }
+      } catch (e) { console.warn('reset error', e); }
     }
   })();
-
 })();
-
-
 
 /* =======================
    HELPERS + UI
    ======================= */
 const $ = s => document.querySelector(s);
 function money(n){ return '$ ' + ((n||0)/100).toFixed(2); }
-
 function toast(msg){
   const d=document.createElement('div');
   d.textContent=msg;
@@ -180,12 +147,11 @@ function toast(msg){
    DATA
    ======================= */
 async function fetchOpenOrders(){
-  // Usamos el endpoint /api/orders/open (evita 404 por query si tu server difiere)
   try{
     if (!(await ensureServer())) throw new Error('offline');
     const r = await api('/api/orders/open');
     if (!r.ok) {
-      // intento alternativo al viejo patrón ?estado=abierto
+      // fallback a API vieja
       const alt = await api('/api/orders?estado=abierto').catch(()=>null);
       if (alt && alt.ok) {
         const jj = await alt.json().catch(()=>({orders:[]}));
@@ -194,7 +160,6 @@ async function fetchOpenOrders(){
       throw new Error('http_'+r.status);
     }
     const j = await r.json().catch(()=>({orders:[]}));
-    // /api/orders/open devuelve { ok:true, orders:[...] }
     const list = Array.isArray(j) ? j : (j.orders || []);
     return normalizeOrders(list);
   }catch(e){
@@ -204,13 +169,12 @@ async function fetchOpenOrders(){
 }
 
 function normalizeOrders(arr){
-  // Evitar duplicados por id/clientId y normalizar campos
   const seen = new Set();
   const out = [];
   for (const o of (arr||[])) {
-    const k = String(o && (o.id ?? o.clientId ?? ''));
-    if (!k || seen.has(k)) continue;
-    seen.add(k);
+    const key = String(o && (o.id ?? o.clientId ?? ''));
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
     const total = (o.total != null)
       ? o.total
       : (o.items||[]).reduce((a,b)=> a + (Number(b.precio)||0)*(Number(b.cant)||0), 0);
@@ -231,10 +195,7 @@ async function setWorkflow(id, workflow){
       method: 'POST',
       body: JSON.stringify({ patch: { workflow } })
     });
-    if (!r.ok) {
-      const t = await r.text().catch(()=> '');
-      throw new Error(`HTTP ${r.status} ${t}`);
-    }
+    if (!r.ok) throw new Error(`HTTP ${r.status} ${await r.text().catch(()=> '')}`);
     return true;
   }catch(e){
     toast('No se pudo actualizar: ' + (e?.message || e));
@@ -262,13 +223,72 @@ function printCocina(o){
 }
 
 /* =======================
+   NOTIFY (sonido + título + sistema)
+   ======================= */
+let KNOWN_ORDER_IDS = new Set();
+let FIRST_RENDER_DONE = false;
+const TITLE_BASE = document.title || 'Cocina';
+
+function ring() {
+  const a = document.getElementById('ding');
+  if (!a) return;
+  try {
+    a.currentTime = 0;
+    a.play().catch(() => showSoundGate());
+  } catch {
+    showSoundGate();
+  }
+}
+function showSoundGate() {
+  if (document.getElementById('soundGate')) return;
+  const g = document.createElement('div');
+  g.id = 'soundGate';
+  g.textContent = '🔔 Habilitar sonido de pedidos';
+  g.style.cssText = 'position:fixed;right:12px;bottom:12px;background:#111a;color:#fff;padding:10px 12px;border:1px solid #333;border-radius:10px;cursor:pointer;z-index:99999';
+  g.onclick = () => {
+    const a = document.getElementById('ding');
+    a?.play().then(() => g.remove()).catch(()=>{});
+  };
+  document.body.appendChild(g);
+}
+function flashTitle(times = 10, ms = 800) {
+  let i = 0;
+  const iv = setInterval(() => {
+    document.title = (i++ % 2) ? '🔔 NUEVO PEDIDO' : TITLE_BASE;
+    if (i > times) { clearInterval(iv); document.title = TITLE_BASE; }
+  }, ms);
+}
+function sysNotify(text) {
+  if (!('Notification' in window)) return;
+  if (Notification.permission === 'granted') {
+    try { new Notification('Nuevo pedido', { body: text }); } catch {}
+  } else if (Notification.permission !== 'denied') {
+    Notification.requestPermission().then(p => {
+      if (p === 'granted') { try { new Notification('Nuevo pedido', { body: text }); } catch {} }
+    });
+  }
+}
+function seedKnown(list){
+  KNOWN_ORDER_IDS = new Set((list||[]).map(o => String(o.id)));
+}
+/** Notifica sólo pedidos nuevos tras el primer render */
+function notifyNewOrders(openOrders = []) {
+  if (!FIRST_RENDER_DONE) return;
+  const fresh = (openOrders || []).filter(o => o && o.estado === 'abierto' && !KNOWN_ORDER_IDS.has(String(o.id)));
+  if (!fresh.length) return;
+  fresh.forEach(o => KNOWN_ORDER_IDS.add(String(o.id)));
+  ring();
+  if (document.hidden) flashTitle();
+  const f = fresh[0];
+  sysNotify(`Mesa ${f.mesa ?? '-'} · ${f.mozo || '-'} · ${f.items?.length || 0} ítems`);
+}
+
+/* =======================
    RENDER
    ======================= */
 async function render(){
   let list = [];
-  try{
-    list = await fetchOpenOrders(); // nunca arroja excepción; si falla devuelve []
-  }catch{ list = []; }
+  try { list = await fetchOpenOrders(); } catch { list = []; }
 
   const pend = list.filter(o=>o.workflow==='pendiente');
   const prep = list.filter(o=>o.workflow==='enprep');
@@ -281,10 +301,13 @@ async function render(){
   $('#cntPrep').textContent = prep.length;
   $('#cntListo').textContent = listo.length;
 
+  if (!FIRST_RENDER_DONE) {
+    seedKnown(list);            // no suena en el primer llenado
+    FIRST_RENDER_DONE = true;
+  } else {
+    notifyNewOrders(list);      // a partir del segundo render, sí
+  }
 
-    notifyNewOrders(list); // 👈 AGREGAR ESTA LÍNEA
-
-  // Wire de acciones (defensivo)
   document.querySelectorAll('.card').forEach(card=>{
     const id = Number(card.dataset.id);
     const data = list.find(o=>Number(o.id)===id);
@@ -322,7 +345,7 @@ function cardHTML(o){
 }
 
 /* =======================
-   SSE (en vivo) + BOOT
+   SSE + BOOT
    ======================= */
 document.getElementById('btnRefrescar').onclick = render;
 
@@ -330,15 +353,33 @@ document.getElementById('btnRefrescar').onclick = render;
   await ensureServer();
   await render();
 
-  // SSE con defensiva (solo si hay server)
+  // Un único EventSource
   try{
     if (await ensureServer()){
-      const es = new EventSource(SERVER + '/api/events');
-es.addEventListener('orders_changed', handleOrdersChanged);
-      es.addEventListener('order_workflow', render);
-      es.addEventListener('order_closed', render);
+      const es = new EventSource(RESTO_SERVER + '/api/events');
       es.addEventListener('hello', e=>console.log('SSE cocina ok', e.data));
-      es.onerror = ()=>console.warn('SSE desconectado…');
+
+      const onAnyOrderChange = (e) => {
+        // Si tu server emite payload con {action:'insert', id}, acá también podemos sonar:
+        try{
+          const p = JSON.parse(e.data||'{}');
+          if (p?.action === 'insert' && p?.id != null && FIRST_RENDER_DONE && !KNOWN_ORDER_IDS.has(String(p.id))){
+            KNOWN_ORDER_IDS.add(String(p.id));
+            ring();
+            if (document.hidden) flashTitle();
+            sysNotify(`Pedido #${p.id} recibido`);
+          }
+        }catch{}
+        render();
+      };
+      es.addEventListener('orders_changed', onAnyOrderChange);
+      es.addEventListener('order_workflow', onAnyOrderChange);
+      es.addEventListener('order_closed',   onAnyOrderChange);
+
+      es.addEventListener('products_changed', render);
+      es.addEventListener('mozos_changed', render);
+
+      es.onerror = (err) => console.warn('SSE cocina desconectado, reintentará...', err);
     } else {
       console.warn('SSE omitido (server offline)');
     }
@@ -346,123 +387,6 @@ es.addEventListener('orders_changed', handleOrdersChanged);
     console.warn('SSE no disponible', e);
   }
 })();
-
-
-
-// ====== Notificaciones nuevas de pedidos (sonido + blink + Notification API) ======
-let KNOWN_ORDER_IDS = new Set();
-const TITLE_BASE = document.title || 'Cocina';
-
-function ring() {
-  const a = document.getElementById('ding');
-  if (!a) return;
-  try {
-    a.currentTime = 0;
-    a.play().catch(() => showSoundGate());
-  } catch {
-    showSoundGate();
-  }
-}
-function showSoundGate() {
-  if (document.getElementById('soundGate')) return;
-  const g = document.createElement('div');
-  g.id = 'soundGate';
-  g.textContent = '🔔 Habilitar sonido de pedidos';
-  g.style.cssText = 'position:fixed;right:12px;bottom:12px;background:#111a;color:#fff;padding:10px 12px;border:1px solid #333;border-radius:10px;cursor:pointer;z-index:99999';
-  g.onclick = () => {
-    const a = document.getElementById('ding');
-    a?.play().then(() => g.remove()).catch(()=>{});
-  };
-  document.body.appendChild(g);
-}
-function flashTitle(times = 10, ms = 800) {
-  let i = 0;
-  const iv = setInterval(() => {
-    document.title = (i++ % 2) ? '🔔 NUEVO PEDIDO' : '🍽️ Cocina';
-    if (i > times) { clearInterval(iv); document.title = TITLE_BASE; }
-  }, ms);
-}
-function sysNotify(text) {
-  if (!('Notification' in window)) return;
-  if (Notification.permission === 'granted') {
-    try { new Notification('Nuevo pedido', { body: text }); } catch {}
-  } else if (Notification.permission !== 'denied') {
-    Notification.requestPermission().then(p => {
-      if (p === 'granted') { try { new Notification('Nuevo pedido', { body: text }); } catch {} }
-    });
-  }
-}
-
-/**
- * Llamá a esto pasando la lista de pedidos abiertos (como ya la traés en render()).
- * Hace sonar/avisar sólo por los que no estaban en KNOWN_ORDER_IDS.
- */
-function notifyNewOrders(openOrders = []) {
-  const fresh = (openOrders || []).filter(o => o && o.estado === 'abierto' && !KNOWN_ORDER_IDS.has(String(o.id)));
-  if (!fresh.length) return;
-
-  // marcar conocidos
-  fresh.forEach(o => KNOWN_ORDER_IDS.add(String(o.id)));
-
-  // notificar
-  ring();
-  flashTitle();
-
-  // notificación del sistema (opcional)
-  const first = fresh[0];
-  sysNotify(`Mesa ${first.mesa ?? '-'} · ${first.mozo || '-'} · ${first.items?.length || 0} ítems`);
-}
-
-
-function handleOrdersChanged(e) {
-  try {
-    const payload = JSON.parse(e.data || '{}');
-    // Si el server manda {action:'insert'} para nuevos pedidos, soná de una
-    if (payload?.action === 'insert' && payload?.id != null) {
-      if (!KNOWN_ORDER_IDS.has(String(payload.id))) {
-        KNOWN_ORDER_IDS.add(String(payload.id));
-        ring();
-        flashTitle();
-        sysNotify(`Pedido #${payload.id} recibido`);
-      }
-    }
-  } catch {}
-  render(); // de todas formas refrescamos columnas
-}
-// === 🔄 Canal SSE: actualiza en tiempo real ===
-(async function startSSE() {
-  try {
-    const SERVER = location.origin; // Render usa el mismo dominio (no pongas localhost)
-    const es = new EventSource(SERVER + '/api/events');
-
-    es.addEventListener('hello', e => console.log('🔌 Conectado SSE:', e.data));
-
-    // 👇 Cuando hay cambio en pedidos, actualizo pantalla
-    es.addEventListener('orders_changed', async e => {
-      console.log('📦 Pedido cambiado', e.data);
-      if (typeof render === 'function') await render();
-    });
-
-    // 👇 Cuando se marca un pedido listo (útil en cocina/mozo)
-    es.addEventListener('pedido_listo', async e => {
-      console.log('✅ Pedido listo', e.data);
-      if (typeof render === 'function') await render();
-    });
-
-    // 👇 Cuando cambian mozos o productos (opcional)
-    es.addEventListener('mozos_changed', async e => {
-      if (typeof render === 'function') await render();
-    });
-    es.addEventListener('products_changed', async e => {
-      if (typeof render === 'function') await render();
-    });
-
-    es.onerror = err => console.warn('⚠️ SSE desconectado, reintentando...', err);
-  } catch (err) {
-    console.error('❌ Error SSE:', err);
-  }
-})();
-
 </script>
 
 
