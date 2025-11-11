@@ -196,12 +196,14 @@ app.post('/api/orders', async (req, res) => {
     list.push(o);
     await writeJSON(ORDERS_FILE, list);
     broadcast('orders_changed', { action: 'insert', id: o.id, order: o });
+    emitEvent('orders_changed', { action: 'insert' , id: o.id})
     return res.json({ ok: true, order: o, id: o.id });
   } else {
     const merged = { ...list[idx], ...o, id: (+list[idx].id || +o.id), clientId: list[idx].clientId || o.clientId };
     list.splice(idx, 1, merged);
     await writeJSON(ORDERS_FILE, list);
-    broadcast('orders_changed', { action: 'update', id: merged.id, order: merged });
+    broadcast('orders_changed', { id: merged.id, action: 'update' });
+    emitEvent('orders_changed', { action: 'update', id: merged.id});
     return res.json({ ok: true, order: merged, id: merged.id });
   }
 });
@@ -230,6 +232,14 @@ app.get('/api/orders/:id', async (req, res) => {
 app.get('/api/orders/open', async (_req, res) => {
   const list = await readJSON(ORDERS_FILE, []);
   res.json({ ok: true, orders: list.filter(o => o.estado === 'abierto') });
+});
+
+// Alias legacy: /api/orders/by-date?date=YYYY-MM-DD
+app.get('/api/orders/by-date', async (req, res) => {
+  const date = String(req.query.date || '').slice(0, 10);
+  const list = await readJSON(ORDERS_FILE, []);
+  const orders = list.filter(o => String(o.fecha || '').slice(0,10) === date && o.estado === 'cerrado');
+  res.json({ ok:true, orders });
 });
 
 // Cambiar estado / aplicar patch

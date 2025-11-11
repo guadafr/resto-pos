@@ -300,6 +300,12 @@
    ============================================================ */
 
 /* ====== Bootstrap de red seguro (compartido) ====== */
+
+
+if (typeof window.renderCaja !== 'function') {
+  window.renderCaja = async function(){ /* noop temporal */ };
+}
+
 (() => {
   const savedHost = localStorage.getItem('restopos_server_host');
   const savedPort = localStorage.getItem('restopos_server_port');
