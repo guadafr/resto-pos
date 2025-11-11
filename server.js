@@ -174,8 +174,49 @@ app.delete('/api/mozos/:id', async (req, res) => {
 });
 
 // ====== Pedidos ======
-function genId() { return Math.floor(Date.now() / 1000); }
-function genClientId() { return 'c_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8); }
+function genId() {
+  return Math.floor(Date.now() / 1000);
+}
+function genClientId() {
+  return 'c_' + Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+}
+
+// GET lista con filtros (?estado, ?tipo, ?date)
+app.get('/api/orders', async (req, res) => {
+  const { estado, tipo, date } = req.query || {};
+  const list = await readJSON(ORDERS_FILE, []);
+  let out = list;
+  if (estado) out = out.filter(o => String(o.estado) === String(estado));
+  if (tipo)   out = out.filter(o => String(o.tipo)   === String(tipo));
+  if (date)   out = out.filter(o => String(o.fecha || '').slice(0,10) === String(date).slice(0,10));
+  res.json({ ok: true, orders: out });
+});
+
+// GET abiertos (compat con front)
+app.get('/api/orders/open', async (_req, res) => {
+  const list = await readJSON(ORDERS_FILE, []);
+  res.json({ ok: true, orders: list.filter(o => o.estado === 'abierto') });
+});
+
+// GET cerrados por día (compat con front viejo)
+app.get('/api/orders/by-date', async (req, res) => {
+  const date = String(req.query.date || '').slice(0,10);
+  if (!date) return res.status(400).json({ ok:false, error:'missing_date' });
+  const list = await readJSON(ORDERS_FILE, []);
+  res.json({
+    ok: true,
+    orders: list.filter(o => o.estado === 'cerrado' && String(o.fecha||'').slice(0,10) === date)
+  });
+});
+
+// GET pedido por id (Admin lo usa a veces)
+app.get('/api/orders/:id', async (req, res) => {
+  const id = +req.params.id;
+  const list = await readJSON(ORDERS_FILE, []);
+  const o = list.find(x => +x.id === id);
+  if (!o) return res.status(404).json({ ok:false, error:'not_found' });
+  res.json(o);
+});
 
 // Crear / Actualizar pedido (upsert por id o clientId)
 app.post('/api/orders', async (req, res) => {
@@ -186,69 +227,41 @@ app.post('/api/orders', async (req, res) => {
 
   let idx = -1;
   if (o.id != null) idx = list.findIndex(x => +x.id === +o.id);
-  if (idx < 0) idx = list.findIndex(x => x.clientId === o.clientId);
+  if (idx < 0)      idx = list.findIndex(x => x.clientId && x.clientId === o.clientId);
 
   if (idx < 0) {
     const maxId = list.reduce((m, x) => Math.max(m, +x.id || 0), 0);
-    o.id = o.id != null ? +o.id : (maxId + 1) || genId();
+    o.id     = o.id != null ? +o.id : (maxId + 1) || genId();
     o.estado = o.estado || 'abierto';
     o.inicio = o.inicio || nowISO();
     list.push(o);
     await writeJSON(ORDERS_FILE, list);
-    broadcast('orders_changed', { action: 'insert', id: o.id, order: o });
-    emitEvent('orders_changed', { action: 'insert' , id: o.id})
+
+    // Eventos
+    broadcast('orders_changed', { id: o.id, action: 'insert' });
+    emitEvent('orders_changed', { action: 'insert', id: o.id });
+
     return res.json({ ok: true, order: o, id: o.id });
   } else {
-    const merged = { ...list[idx], ...o, id: (+list[idx].id || +o.id), clientId: list[idx].clientId || o.clientId };
+    const merged = { ...list[idx], ...o, id: (+list[idx].id || +o.id), clientId: (list[idx].clientId || o.clientId) };
     list.splice(idx, 1, merged);
     await writeJSON(ORDERS_FILE, list);
+
+    // Eventos
     broadcast('orders_changed', { id: merged.id, action: 'update' });
-    emitEvent('orders_changed', { action: 'update', id: merged.id});
+    emitEvent('orders_changed', { action: 'update', id: merged.id });
+
     return res.json({ ok: true, order: merged, id: merged.id });
   }
 });
 
-// Obtener pedidos (con filtros)
-app.get('/api/orders', async (req, res) => {
-  const { estado, tipo, date } = req.query || {};
-  const list = await readJSON(ORDERS_FILE, []);
-  let out = list;
-  if (estado) out = out.filter(o => String(o.estado) === String(estado));
-  if (tipo)   out = out.filter(o => String(o.tipo) === String(tipo));
-  if (date)   out = out.filter(o => String(o.fecha || '').slice(0, 10) === String(date).slice(0, 10));
-  res.json({ ok: true, orders: out });
-});
-
-// Obtener pedido por id (útil para Admin/Mozo)
-app.get('/api/orders/:id', async (req, res) => {
-  const id = String(req.params.id || '');
-  const list = await readJSON(ORDERS_FILE, []);
-  const o = list.find(x => String(x.id) === id);
-  if (!o) return res.status(404).json({ ok: false, error: 'not_found' });
-  res.json(o);
-});
-
-// Pedidos abiertos
-app.get('/api/orders/open', async (_req, res) => {
-  const list = await readJSON(ORDERS_FILE, []);
-  res.json({ ok: true, orders: list.filter(o => o.estado === 'abierto') });
-});
-
-// Alias legacy: /api/orders/by-date?date=YYYY-MM-DD
-app.get('/api/orders/by-date', async (req, res) => {
-  const date = String(req.query.date || '').slice(0, 10);
-  const list = await readJSON(ORDERS_FILE, []);
-  const orders = list.filter(o => String(o.fecha || '').slice(0,10) === date && o.estado === 'cerrado');
-  res.json({ ok:true, orders });
-});
-
-// Cambiar estado / aplicar patch
+// Cambiar estado / aplicar patch parcial (incluye workflow)
 app.post('/api/orders/:id/status', async (req, res) => {
   const id = +req.params.id;
   const { estado, motivo, patch } = req.body || {};
   const list = await readJSON(ORDERS_FILE, []);
   const idx = list.findIndex(x => +x.id === id);
-  if (idx < 0) return res.status(404).json({ ok: false });
+  if (idx < 0) return res.status(404).json({ ok: false, error:'not_found' });
 
   if (estado) list[idx].estado = estado;
   if (motivo) { list[idx].cancelReason = motivo; list[idx].cancelTs = nowISO(); }
@@ -256,15 +269,13 @@ app.post('/api/orders/:id/status', async (req, res) => {
 
   await writeJSON(ORDERS_FILE, list);
 
-  broadcast('orders_changed', { action: 'status', id, estado: list[idx].estado, order: list[idx] });
-  if (patch && patch.workflow === 'listo') {
-    emitEvent('pedido_listo', { id, mesa: list[idx].mesa, mozo: list[idx].mozo });
-  }
+  broadcast('orders_changed', { id, action: 'status', estado, order: list[idx] });
+  emitEvent('orders_changed', { action: 'status', id, estado });
 
   res.json({ ok: true, order: list[idx] });
 });
 
-// Cobrar pedido (cierra + stock + caja + eventos)
+// Cobrar pedido (impacta stock y emite eventos + caja por SSE para front)
 app.post('/api/orders/:id/charge', async (req, res) => {
   const id = +req.params.id;
   const { pagos = [], descuento = 0 } = req.body || {};
@@ -273,23 +284,23 @@ app.post('/api/orders/:id/charge', async (req, res) => {
   if (idx < 0) return res.status(404).json({ ok: false, error: 'not_found' });
 
   const order = list[idx];
-  const total    = (order.items || []).reduce((a, b) => a + (b.precio || 0) * (b.cant || 0), 0);
+  const total    = (order.items || []).reduce((a,b)=> a + (b.precio||0)*(b.cant||0), 0);
   const aCobrar  = Math.max(0, total - Math.max(0, +descuento || 0));
-  const sumaPago = (pagos || []).reduce((a, p) => a + (+p.monto || 0), 0);
+  const sumaPago = (pagos || []).reduce((a,p)=> a + (+p.monto || 0), 0);
   if (sumaPago !== aCobrar) {
-    return res.status(400).json({ ok: false, error: 'sum_mismatch', total, descuento, aCobrar, sumaPagos: sumaPago });
+    return res.status(400).json({ ok:false, error:'sum_mismatch', total, descuento, aCobrar, sumaPagos:sumaPago });
   }
 
-  // stock
+  // Stock
   const prods = await readJSON(PRODUCTS_FILE, []);
   let changed = false;
   for (const it of (order.items || [])) {
     const p = prods.find(x => String(x.id) === String(it.id));
     if (p && p.trackStock) { p.stock = Math.max(0, (p.stock || 0) - (it.cant || 0)); changed = true; }
   }
-  if (changed) { await writeJSON(PRODUCTS_FILE, prods); broadcast('products_changed', { count: prods.length }); }
+  if (changed) { await writeJSON(PRODUCTS_FILE, prods); broadcast('products_changed', { count: prods.length }); emitEvent('products_changed', { count: prods.length }); }
 
-  // cerrar pedido
+  // Cierre pedido
   order.total        = total;
   order.descuento    = Math.max(0, +descuento || 0);
   order.totalCobrado = aCobrar;
@@ -299,28 +310,17 @@ app.post('/api/orders/:id/charge', async (req, res) => {
   list.splice(idx, 1, order);
   await writeJSON(ORDERS_FILE, list);
 
-  // caja (si hay abierta)
-  const cash = await readJSON(CASH_FILE, []);
-  const openIdx = cash.findIndex(b => !b.cierre);
-  if (openIdx >= 0) {
-    const box = normalizeBox(cash[openIdx]);
-    box.ventasTotal = (box.ventasTotal || 0) + aCobrar;
-    for (const p of pagos) {
-      const key = mapPagoKey(p.tipo);
-      box.ventasByPay[key] = (box.ventasByPay[key] || 0) + (+p.monto || 0);
-      box.movs.push({ ts: nowISO(), tipo: 'venta', medio: p.tipo, desc: `Mesa ${order.mesa ?? '-'} · ${order.mozo || '-'}`, monto: +p.monto || 0 });
-    }
-    cash.splice(openIdx, 1, box);
-    await writeJSON(CASH_FILE, cash);
-    broadcast('cash_updated', { action: 'mov' });
-  }
-
-  // eventos de pedido
   broadcast('order_closed', { id: order.id, order });
-  broadcast('orders_changed', { action: 'closed', id: order.id, order });
+  emitEvent('order_closed', { id: order.id });
+
+  broadcast('orders_changed', { id: order.id, action: 'closed' });
+  emitEvent('orders_changed', { action: 'closed', id: order.id });
 
   res.json({ ok: true, order, id: order.id });
 });
+
+
+
 
 // ====== Caja ======
 app.post('/api/cash/open', async (req, res) => {
