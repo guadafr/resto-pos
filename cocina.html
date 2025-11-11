@@ -61,6 +61,16 @@
 /* =======================
    SERVER CONFIG COMÚN
    ======================= */
+
+   // Ponelo una sola vez, al inicio del <script>
+window.addEventListener('unhandledrejection', (e) => {
+  const r = e.reason;
+  if (r && (r.name === 'AbortError' || String(r).includes('AbortError'))) {
+    e.preventDefault();
+    console.warn('[unhandledrejection] AbortError silenciada');
+  }
+});
+
 (() => {
   const savedHost = localStorage.getItem('restopos_server_host');
   const savedPort = localStorage.getItem('restopos_server_port');
@@ -76,22 +86,42 @@
   window.RESTO_SERVER = SERVER;
   console.log('[RestoPOS] SERVER =', SERVER);
 
-  const DEFAULT_HEADERS = { 'Content-Type': 'application/json' };
-  function api(path, opt = {}) {
-    const controller = new AbortController();
-    const t = setTimeout(() => controller.abort(), opt.timeoutMs ?? 8000);
-    const url = `${SERVER}${path}`;
-    const fetchOpts = {
-      method: opt.method || 'GET',
-      headers: Object.assign({}, DEFAULT_HEADERS, opt.headers || {}),
-      body: opt.body,
-      cache: 'no-store',
-      signal: controller.signal,
-      credentials: 'same-origin',
-      mode: 'cors'
-    };
-    return fetch(url, fetchOpts).finally(() => clearTimeout(t));
-  }
+  // ⬇️ Reemplazo completo del helper api()
+const DEFAULT_HEADERS = { 'Content-Type': 'application/json' };
+
+function api(path, opt = {}) {
+  const controller = new AbortController();
+  const timeoutMs = Number.isFinite(opt.timeoutMs) ? opt.timeoutMs : 12000; // 12s
+  const id = setTimeout(() => controller.abort(new DOMException('timeout', 'AbortError')), timeoutMs);
+
+  const url = `${SERVER}${path}`;
+  const fetchOpts = {
+    method: opt.method || 'GET',
+    headers: { ...DEFAULT_HEADERS, ...(opt.headers || {}) },
+    body: opt.body,
+    cache: 'no-store',
+    signal: controller.signal,
+    credentials: 'same-origin',
+    mode: 'cors'
+  };
+
+  return fetch(url, fetchOpts)
+    .catch(err => {
+      // Si se abortó por timeout, devolvemos una Response “suave” en vez de tirar excepción
+      if (err && err.name === 'AbortError') {
+        console.warn('[api] timeout:', path);
+        return new Response(JSON.stringify({ ok: false, aborted: true }), {
+          status: 499,
+          statusText: 'Client Timeout',
+          headers: { 'Content-Type': 'application/json' }
+        });
+      }
+      // Otros errores sí se relanzan
+      throw err;
+    })
+    .finally(() => clearTimeout(id));
+}
+
   window.api = api;
 
   let SERVER_OK = false;
