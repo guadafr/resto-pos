@@ -1272,6 +1272,39 @@ async function renderHistorial() {
     console.warn('renderHistorial error', e);
   }
 }
+async function renderCaja() {
+  try {
+    const r = await api('/api/cash/open');
+    if (!r.ok) throw new Error('closed');
+    const box = await r.json();
+    document.getElementById('estadoCaja').textContent = 'ABIERTA';
+    document.getElementById('montoApertura').textContent = '$ ' + ((box.apertura||0)/100).toFixed(2);
+  } catch {
+    document.getElementById('estadoCaja').textContent = 'CERRADA';
+    document.getElementById('montoApertura').textContent = '-';
+  }
+}
+
+async function renderHistorial() {
+  try {
+    const r = await api('/api/cash/history');
+    if (!r.ok) return;
+    const list = await r.json();
+    const tb = document.getElementById('historialBody');
+    if (!tb) return;
+    tb.innerHTML = (list||[]).map(b=>{
+      const fecha = new Date(b.aperturaTs || b.cierreTs || '').toLocaleString();
+      const total = (b.apertura||0) + (b.ingresosTotal||0) + (b.ventasTotal||0) - (b.egresosTotal||0);
+      return `<tr>
+        <td>${fecha}</td>
+        <td>${b.cajero || '-'}</td>
+        <td>${b.turno || '-'}</td>
+        <td>${((b.final||0)/100).toFixed(2)}</td>
+        <td>${(total/100).toFixed(2)}</td>
+      </tr>`;
+    }).join('');
+  } catch {}
+}
 
 /* ---- Boot ---- */
 (async function boot(){
