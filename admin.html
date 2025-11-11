@@ -1243,6 +1243,36 @@ $('#cfgGuardar').onclick=async()=>{
   alert('Configuración guardada en este equipo. Recargá Mozo/Admin para aplicar cambios.');
 };
 
+
+/* =======================
+   HISTORIAL DE CAJAS (reparado)
+   ======================= */
+async function renderHistorial() {
+  try {
+    if (!(await ensureServer())) throw new Error('offline');
+    const r = await api('/api/cash/history');
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const list = await r.json();
+
+    const cont = document.getElementById('historialBody');
+    if (!cont) return;
+    cont.innerHTML = (list || []).map(b => {
+      const fecha = new Date(b.aperturaTs || b.cierreTs || '').toLocaleString();
+      const total = (b.ventasTotal || 0) + (b.ingresosTotal || 0) - (b.egresosTotal || 0);
+      return `
+        <tr>
+          <td>${fecha}</td>
+          <td>${b.cajero || '-'}</td>
+          <td>${b.turno || '-'}</td>
+          <td>${(b.final || 0).toFixed(2)}</td>
+          <td>${total.toFixed(2)}</td>
+        </tr>`;
+    }).join('');
+  } catch (e) {
+    console.warn('renderHistorial error', e);
+  }
+}
+
 /* ---- Boot ---- */
 (async function boot(){
   if ('serviceWorker' in navigator) {
