@@ -53,7 +53,6 @@
   </div>
 </main>
 
-
 <!-- Sonido para nuevos pedidos -->
 <audio id="ding" src="beep.mp3" preload="auto"></audio>
 
@@ -62,7 +61,7 @@
    SERVER CONFIG COMÚN
    ======================= */
 
-   // Ponelo una sola vez, al inicio del <script>
+// Silenciar AbortError globales (timeouts)
 window.addEventListener('unhandledrejection', (e) => {
   const r = e.reason;
   if (r && (r.name === 'AbortError' || String(r).includes('AbortError'))) {
@@ -86,42 +85,38 @@ window.addEventListener('unhandledrejection', (e) => {
   window.RESTO_SERVER = SERVER;
   console.log('[RestoPOS] SERVER =', SERVER);
 
-  // ⬇️ Reemplazo completo del helper api()
-const DEFAULT_HEADERS = { 'Content-Type': 'application/json' };
+  // fetch helper con timeout amable
+  const DEFAULT_HEADERS = { 'Content-Type': 'application/json' };
+  function api(path, opt = {}) {
+    const controller = new AbortController();
+    const timeoutMs = Number.isFinite(opt.timeoutMs) ? opt.timeoutMs : 12000; // 12s
+    const id = setTimeout(() => controller.abort(new DOMException('timeout', 'AbortError')), timeoutMs);
 
-function api(path, opt = {}) {
-  const controller = new AbortController();
-  const timeoutMs = Number.isFinite(opt.timeoutMs) ? opt.timeoutMs : 12000; // 12s
-  const id = setTimeout(() => controller.abort(new DOMException('timeout', 'AbortError')), timeoutMs);
+    const url = `${SERVER}${path}`;
+    const fetchOpts = {
+      method: opt.method || 'GET',
+      headers: { ...DEFAULT_HEADERS, ...(opt.headers || {}) },
+      body: opt.body,
+      cache: 'no-store',
+      signal: controller.signal,
+      credentials: 'same-origin',
+      mode: 'cors'
+    };
 
-  const url = `${SERVER}${path}`;
-  const fetchOpts = {
-    method: opt.method || 'GET',
-    headers: { ...DEFAULT_HEADERS, ...(opt.headers || {}) },
-    body: opt.body,
-    cache: 'no-store',
-    signal: controller.signal,
-    credentials: 'same-origin',
-    mode: 'cors'
-  };
-
-  return fetch(url, fetchOpts)
-    .catch(err => {
-      // Si se abortó por timeout, devolvemos una Response “suave” en vez de tirar excepción
-      if (err && err.name === 'AbortError') {
-        console.warn('[api] timeout:', path);
-        return new Response(JSON.stringify({ ok: false, aborted: true }), {
-          status: 499,
-          statusText: 'Client Timeout',
-          headers: { 'Content-Type': 'application/json' }
-        });
-      }
-      // Otros errores sí se relanzan
-      throw err;
-    })
-    .finally(() => clearTimeout(id));
-}
-
+    return fetch(url, fetchOpts)
+      .catch(err => {
+        if (err && err.name === 'AbortError') {
+          console.warn('[api] timeout:', path);
+          return new Response(JSON.stringify({ ok: false, aborted: true }), {
+            status: 499,
+            statusText: 'Client Timeout',
+            headers: { 'Content-Type': 'application/json' }
+          });
+        }
+        throw err;
+      })
+      .finally(() => clearTimeout(id));
+  }
   window.api = api;
 
   let SERVER_OK = false;
@@ -261,7 +256,19 @@ function printCocina(o){
    NOTIFY (sonido + título + sistema)
    ======================= */
 let KNOWN_ORDER_IDS = new Set();
+let FIRST_RENDER_DONE = false;       // ✅ FIX: declarado
 const TITLE_BASE = document.title || 'Cocina';
+
+// Inicializa el set de pedidos conocidos (no sonar en el primer render)
+function seedKnown(list){
+  try{
+    (list||[]).forEach(o => {
+      if (o && (o.id != null || o.clientId)) {
+        KNOWN_ORDER_IDS.add(String(o.id ?? o.clientId));
+      }
+    });
+  }catch{}
+}
 
 // Hace sonar el beep
 function ring() {
@@ -320,7 +327,7 @@ function notifyNewOrders(openOrders = []) {
 
   nuevos.forEach(o => KNOWN_ORDER_IDS.add(String(o.id)));
   ring();
-  flashTitle();
+  if (document.hidden) flashTitle();
   const first = nuevos[0];
   sysNotify(`Mesa ${first.mesa ?? '-'} · ${first.mozo || '-'} · ${first.items?.length || 0} ítems`);
 }
@@ -402,7 +409,7 @@ document.getElementById('btnRefrescar').onclick = render;
       es.addEventListener('hello', e=>console.log('SSE cocina ok', e.data));
 
       const onAnyOrderChange = (e) => {
-        // Si tu server emite payload con {action:'insert', id}, acá también podemos sonar:
+        // Si el server emite {action:'insert', id}, sonar al instante
         try{
           const p = JSON.parse(e.data||'{}');
           if (p?.action === 'insert' && p?.id != null && FIRST_RENDER_DONE && !KNOWN_ORDER_IDS.has(String(p.id))){
