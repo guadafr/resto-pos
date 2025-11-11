@@ -216,6 +216,8 @@ app.get('/api/orders/:id', async (req, res) => {
   const o = list.find(x => +x.id === id);
   if (!o) return res.status(404).json({ ok:false, error:'not_found' });
   res.json(o);
+
+
 });
 
 // Crear / Actualizar pedido (upsert por id o clientId)
@@ -275,50 +277,83 @@ app.post('/api/orders/:id/status', async (req, res) => {
   res.json({ ok: true, order: list[idx] });
 });
 
-// Cobrar pedido (impacta stock y emite eventos + caja por SSE para front)
+// Cobrar pedido (impacta caja + stock + broadcast)
 app.post('/api/orders/:id/charge', async (req, res) => {
   const id = +req.params.id;
-  const { pagos = [], descuento = 0 } = req.body || {};
+  const { pagos = [], descuento = 0, nota = '' } = req.body || {};
+
   const list = await readJSON(ORDERS_FILE, []);
   const idx = list.findIndex(x => +x.id === id);
   if (idx < 0) return res.status(404).json({ ok: false, error: 'not_found' });
 
   const order = list[idx];
-  const total    = (order.items || []).reduce((a,b)=> a + (b.precio||0)*(b.cant||0), 0);
-  const aCobrar  = Math.max(0, total - Math.max(0, +descuento || 0));
-  const sumaPago = (pagos || []).reduce((a,p)=> a + (+p.monto || 0), 0);
+  const total    = (order.items || []).reduce((a, b) => a + (b.precio || 0) * (b.cant || 0), 0);
+  const desc     = Math.max(0, +descuento || 0);
+  const aCobrar  = Math.max(0, total - desc);
+  const sumaPago = (pagos || []).reduce((a, p) => a + (+p.monto || 0), 0);
+
   if (sumaPago !== aCobrar) {
-    return res.status(400).json({ ok:false, error:'sum_mismatch', total, descuento, aCobrar, sumaPagos:sumaPago });
+    return res.status(400).json({ ok: false, error: 'sum_mismatch', total, descuento: desc, aCobrar, sumaPagos: sumaPago });
   }
 
-  // Stock
+  // ↓↓↓ stock
   const prods = await readJSON(PRODUCTS_FILE, []);
   let changed = false;
   for (const it of (order.items || [])) {
     const p = prods.find(x => String(x.id) === String(it.id));
-    if (p && p.trackStock) { p.stock = Math.max(0, (p.stock || 0) - (it.cant || 0)); changed = true; }
+    if (p && p.trackStock) {
+      p.stock = Math.max(0, (p.stock || 0) - (it.cant || 0));
+      changed = true;
+    }
   }
-  if (changed) { await writeJSON(PRODUCTS_FILE, prods); broadcast('products_changed', { count: prods.length }); emitEvent('products_changed', { count: prods.length }); }
+  if (changed) {
+    await writeJSON(PRODUCTS_FILE, prods);
+    broadcast('products_changed', { count: prods.length });
+  }
 
-  // Cierre pedido
+  // ↓↓↓ cerrar pedido
   order.total        = total;
-  order.descuento    = Math.max(0, +descuento || 0);
+  order.descuento    = desc;
   order.totalCobrado = aCobrar;
   order.pagos        = pagos;
+  order.nota         = order.nota || nota || '';
   order.estado       = 'cerrado';
   order.cierre       = nowISO();
   list.splice(idx, 1, order);
   await writeJSON(ORDERS_FILE, list);
 
-  broadcast('order_closed', { id: order.id, order });
-  emitEvent('order_closed', { id: order.id });
+  // ↓↓↓ impactar CAJA (si hay abierta)
+  const cash = await readJSON(CASH_FILE, []);
+  const openIdx = cash.findIndex(b => !b.cierre);
+  if (openIdx >= 0) {
+    const box = normalizeBox(cash[openIdx]);
+    box.ventasTotal = (box.ventasTotal || 0) + aCobrar;
 
+    for (const p of pagos) {
+      const key = mapPagoKey(p.tipo);
+      box.ventasByPay[key] = (box.ventasByPay[key] || 0) + (+p.monto || 0);
+      box.movs.push({
+        ts: nowISO(),
+        tipo: 'venta',
+        medio: p.tipo,
+        desc: `Mesa ${order.mesa ?? '-'} · ${order.mozo || '-'}`,
+        monto: +p.monto || 0,
+        fuente: 'server',
+        pedidoId: order.id
+      });
+    }
+
+    cash.splice(openIdx, 1, box);
+    await writeJSON(CASH_FILE, cash);
+    broadcast('cash_updated', { action: 'venta', pedidoId: order.id, total: aCobrar });
+  }
+
+  // broadcasts de pedido
+  broadcast('order_closed',   { id: order.id, order });
   broadcast('orders_changed', { id: order.id, action: 'closed' });
-  emitEvent('orders_changed', { action: 'closed', id: order.id });
 
   res.json({ ok: true, order, id: order.id });
 });
-
 
 
 
