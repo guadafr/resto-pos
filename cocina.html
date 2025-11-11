@@ -52,6 +52,11 @@
     </div>
   </div>
 </main>
+
+
+<!-- Sonido para nuevos pedidos -->
+<audio id="ding" src="beep.mp3" preload="auto"></audio>
+
 <script>
 /* =======================
    SERVER CONFIG COMÚN
@@ -226,9 +231,9 @@ function printCocina(o){
    NOTIFY (sonido + título + sistema)
    ======================= */
 let KNOWN_ORDER_IDS = new Set();
-let FIRST_RENDER_DONE = false;
 const TITLE_BASE = document.title || 'Cocina';
 
+// Hace sonar el beep
 function ring() {
   const a = document.getElementById('ding');
   if (!a) return;
@@ -239,6 +244,8 @@ function ring() {
     showSoundGate();
   }
 }
+
+// Si el navegador bloquea el sonido, muestra un botón “habilitar sonido”
 function showSoundGate() {
   if (document.getElementById('soundGate')) return;
   const g = document.createElement('div');
@@ -247,17 +254,24 @@ function showSoundGate() {
   g.style.cssText = 'position:fixed;right:12px;bottom:12px;background:#111a;color:#fff;padding:10px 12px;border:1px solid #333;border-radius:10px;cursor:pointer;z-index:99999';
   g.onclick = () => {
     const a = document.getElementById('ding');
-    a?.play().then(() => g.remove()).catch(()=>{});
+    a?.play().then(() => {
+      g.remove();
+      toast('🔊 Sonido habilitado');
+    }).catch(() => {});
   };
   document.body.appendChild(g);
 }
-function flashTitle(times = 10, ms = 800) {
+
+// Cambia el título por unos segundos
+function flashTitle(times = 8, ms = 800) {
   let i = 0;
   const iv = setInterval(() => {
     document.title = (i++ % 2) ? '🔔 NUEVO PEDIDO' : TITLE_BASE;
     if (i > times) { clearInterval(iv); document.title = TITLE_BASE; }
   }, ms);
 }
+
+// Notificación del sistema (Windows/Android)
 function sysNotify(text) {
   if (!('Notification' in window)) return;
   if (Notification.permission === 'granted') {
@@ -268,19 +282,17 @@ function sysNotify(text) {
     });
   }
 }
-function seedKnown(list){
-  KNOWN_ORDER_IDS = new Set((list||[]).map(o => String(o.id)));
-}
-/** Notifica sólo pedidos nuevos tras el primer render */
+
+// Detecta nuevos pedidos y reproduce sonido
 function notifyNewOrders(openOrders = []) {
-  if (!FIRST_RENDER_DONE) return;
-  const fresh = (openOrders || []).filter(o => o && o.estado === 'abierto' && !KNOWN_ORDER_IDS.has(String(o.id)));
-  if (!fresh.length) return;
-  fresh.forEach(o => KNOWN_ORDER_IDS.add(String(o.id)));
+  const nuevos = (openOrders || []).filter(o => o.estado === 'abierto' && !KNOWN_ORDER_IDS.has(String(o.id)));
+  if (!nuevos.length) return;
+
+  nuevos.forEach(o => KNOWN_ORDER_IDS.add(String(o.id)));
   ring();
-  if (document.hidden) flashTitle();
-  const f = fresh[0];
-  sysNotify(`Mesa ${f.mesa ?? '-'} · ${f.mozo || '-'} · ${f.items?.length || 0} ítems`);
+  flashTitle();
+  const first = nuevos[0];
+  sysNotify(`Mesa ${first.mesa ?? '-'} · ${first.mozo || '-'} · ${first.items?.length || 0} ítems`);
 }
 
 /* =======================
@@ -388,12 +400,6 @@ document.getElementById('btnRefrescar').onclick = render;
   }
 })();
 </script>
-
-
-<!-- Sonido para nuevos pedidos -->
-<audio id="ding" preload="auto">
-  <source src="beep.mp3" type="audio/mpeg">
-</audio>
 
 </body>
 </html>
